@@ -1,4 +1,4 @@
-import { Conversation, Message, Memory, Skill, AppSettings, AIProviderConfig } from '../types';
+import { Conversation, Message, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor } from '../types';
 
 export function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback;
@@ -85,6 +85,8 @@ export function normalizeProvider(raw: Partial<AIProviderConfig>): AIProviderCon
   };
 }
 
+const VALID_THEME_COLORS: ThemeColor[] = ["dynamic", "ocean", "purple", "forest", "slate", "rose"];
+
 export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
   return {
     agentName: raw.agentName || "Hermes",
@@ -92,6 +94,9 @@ export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
     useMemoryByDefault: raw.useMemoryByDefault !== undefined ? Boolean(raw.useMemoryByDefault) : true,
     activateSkillsByDefault: raw.activateSkillsByDefault !== undefined ? Boolean(raw.activateSkillsByDefault) : true,
     theme: ["dark", "light", "system"].includes(raw.theme as string) ? raw.theme as any : "dark",
+    themeColor: VALID_THEME_COLORS.includes(raw.themeColor as ThemeColor) ? raw.themeColor as ThemeColor : "dynamic",
+    amoledBlack: raw.amoledBlack !== undefined ? Boolean(raw.amoledBlack) : false,
+    systemFont: raw.systemFont !== undefined ? Boolean(raw.systemFont) : false,
     streamingEnabled: raw.streamingEnabled !== undefined ? Boolean(raw.streamingEnabled) : true,
     activeProviderId: raw.activeProviderId,
     activeModelId: raw.activeModelId
