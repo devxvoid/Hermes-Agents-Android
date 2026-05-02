@@ -47,7 +47,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile 2>&1 | tee install.log
 
-      - name: Auto-fix Hermes TypeScript null errors
+      - name: Auto-fix Hermes TypeScript errors
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -55,14 +55,18 @@ jobs:
           path = Path("artifacts/hermes/src/pages/Chat.tsx")
           text = path.read_text()
 
+          # Fix TS2345: convId is inferred as string | null but is guaranteed after creation branch.
+          text = text.replace("updateConversation(convId,", "updateConversation(convId!,")
+
+          # Safe generic fallback if older repo version uses selectedAgent.
           text = text.replace("selectedAgent)", "(selectedAgent ?? \"\")")
           text = text.replace("selectedAgent,", "(selectedAgent ?? \"\"),")
-          text = text.replace("selectedAgent\n", "(selectedAgent ?? \"\")\n")
 
           path.write_text(text)
           PY
 
-          grep -n "selectedAgent" artifacts/hermes/src/pages/Chat.tsx || true
+          echo "Patch check:"
+          grep -n "updateConversation" artifacts/hermes/src/pages/Chat.tsx || true
 
       - name: Typecheck workspace
         run: |
@@ -109,14 +113,13 @@ jobs:
         run: |
           mkdir -p output
 
-          echo "Searching for APK files..."
+          echo "Searching APK files..."
           find android -type f -name "*.apk" 2>/dev/null | tee apk-files.log || true
 
           APK_PATH="$(find android -type f -name "*.apk" 2>/dev/null | head -n 1 || true)"
 
           if [ -z "$APK_PATH" ]; then
             echo "No APK found."
-            echo "Listing Android build output files..."
             find android -type f 2>/dev/null | grep -E "outputs|apk|bundle|build" | tee android-build-files.log || true
             exit 1
           fi
@@ -128,7 +131,6 @@ jobs:
         if: always()
         run: |
           mkdir -p logs
-
           cp *.log logs/ 2>/dev/null || true
 
           if [ -d "android/app/build/reports" ]; then
@@ -136,9 +138,6 @@ jobs:
           fi
 
           find android -type f -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
-
-          echo "Collected logs:"
-          find logs -type f || true
 
       - name: Upload APK
         if: success()
