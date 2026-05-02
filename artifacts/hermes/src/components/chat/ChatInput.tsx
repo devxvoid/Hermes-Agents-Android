@@ -39,14 +39,15 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
   };
 
   return (
-    <div className="border-t border-border bg-background/80 backdrop-blur-md px-4 py-3" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
+    <div className="glass-nav border-t border-white/[0.07] px-3 py-3"
+      style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
       <div className="max-w-3xl mx-auto">
         <div className="flex items-end gap-2">
           <Button
             size="icon"
             variant="outline"
             onClick={onNewChat}
-            className="shrink-0 h-10 w-10 rounded-xl"
+            className="shrink-0 h-10 w-10 rounded-xl glass border-white/10 hover:border-white/20"
             data-testid="btn-new-chat"
             title="New chat"
           >
@@ -54,7 +55,7 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
           </Button>
 
           <div className={cn(
-            'flex-1 flex items-end gap-2 bg-card border border-card-border rounded-xl px-3 py-2 transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20',
+            'flex-1 flex items-end gap-2 glass-input rounded-2xl px-4 py-2.5',
             disabled && 'opacity-60'
           )}>
             <textarea
@@ -66,22 +67,22 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
               disabled={disabled}
               rows={1}
               data-testid="input-chat-message"
-              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none max-h-40 leading-relaxed"
+              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none max-h-40 leading-relaxed"
               style={{ minHeight: '24px' }}
             />
             <Button
               size="icon"
               onClick={handleSend}
               disabled={!value.trim() || disabled}
-              className="shrink-0 h-8 w-8 rounded-lg"
+              className="shrink-0 h-8 w-8 rounded-xl glow-primary"
               data-testid="btn-send-message"
             >
               <Send className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Enter to send, Shift+Enter for newline
+        <p className="text-[10px] text-muted-foreground/50 mt-2 text-center">
+          Enter to send · Shift+Enter for newline
         </p>
       </div>
     </div>

@@ -184,17 +184,144 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+  html, body, #root {
+    height: 100%;
+  }
 }
 
+/* ─── Liquid Glass Utilities ─────────────────────────────────── */
 @layer utilities {
+
+  /* Core glass surface */
+  .glass {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+      0 4px 24px 0 rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  /* Stronger glass for prominent surfaces */
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+      0 8px 32px 0 rgba(0, 0, 0, 0.35),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.10);
+  }
+
+  /* Subtle glass for nav bars */
+  .glass-nav {
+    background: rgba(10, 12, 22, 0.72);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 -4px 24px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* Sidebar glass */
+  .glass-sidebar {
+    background: rgba(8, 10, 20, 0.80);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* Input glass */
+  .glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .glass-input:focus-within {
+    border-color: rgba(99, 179, 237, 0.50);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      0 0 0 3px rgba(99, 179, 237, 0.12);
+  }
+
+  /* Card glass */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  }
+  .glass-card:hover {
+    border-color: rgba(99, 179, 237, 0.25);
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    transform: translateY(-1px);
+  }
+
+  /* Liquid shimmer top edge */
+  .glass-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-shine::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255,255,255,0.25) 30%,
+      rgba(99,179,237,0.4) 50%,
+      rgba(255,255,255,0.25) 70%,
+      transparent 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Glow ring for active elements */
+  .glow-primary {
+    box-shadow: 0 0 16px rgba(99, 179, 237, 0.35), 0 0 32px rgba(99, 179, 237, 0.15);
+  }
+
+  /* Bubble message glass */
+  .glass-bubble-ai {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.20),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Scroll area no-scrollbar */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }
+
   [contenteditable][data-placeholder]:empty::before {
     content: attr(data-placeholder);
     color: hsl(var(--muted-foreground));
     pointer-events: none;
   }
+
   .toggle-elevate::before,
   .toggle-elevate-2::before {
     content: "";

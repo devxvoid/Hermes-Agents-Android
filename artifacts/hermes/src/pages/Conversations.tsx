@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/common/EmptyState';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 type Filter = 'all' | 'pinned' | 'archived';
 
@@ -50,29 +49,30 @@ export default function Conversations() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4 pb-24 md:pb-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Conversations</h1>
-          <p className="text-sm text-muted-foreground">{conversations.filter(c => !c.archived).length} active conversations</p>
+          <p className="text-sm text-muted-foreground">{conversations.filter(c => !c.archived).length} active</p>
         </div>
+        <Button size="sm" onClick={() => setLocation('/chat')} className="glow-primary">
+          <MessageSquare className="w-4 h-4 mr-1.5" />New Chat
+        </Button>
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search conversations..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-conversations"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search conversations..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-9 glass-input border-white/10"
+          data-testid="input-search-conversations"
+        />
       </div>
 
       <Tabs value={filter} onValueChange={v => setFilter(v as Filter)}>
-        <TabsList>
+        <TabsList className="glass border-white/10">
           <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
           <TabsTrigger value="pinned" data-testid="tab-pinned">Pinned</TabsTrigger>
           <TabsTrigger value="archived" data-testid="tab-archived">Archived</TabsTrigger>
@@ -92,11 +92,11 @@ export default function Conversations() {
             <div
               key={conv.id}
               data-testid={`conversation-${conv.id}`}
-              className="group bg-card border border-card-border rounded-xl p-4 hover:border-primary/30 transition-all cursor-pointer"
+              className="group glass-card rounded-2xl p-4 cursor-pointer"
               onClick={() => setLocation(`/chat/${conv.id}`)}
             >
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl glass flex items-center justify-center shrink-0">
                   <MessageSquare className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -104,33 +104,40 @@ export default function Conversations() {
                     {conv.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
                     <span className="font-medium text-foreground text-sm truncate">{conv.title}</span>
                     {conv.archived && (
-                      <span className="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded shrink-0">Archived</span>
+                      <span className="text-xs text-muted-foreground glass px-1.5 py-0.5 rounded shrink-0">Archived</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })}
+                    </span>
                     <span>{conv.messages.length} messages</span>
-                    {conv.tags.length > 0 && <span>{conv.tags.slice(0, 2).join(', ')}</span>}
                   </div>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0" data-testid={`btn-conv-menu-${conv.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0 glass"
+                      data-testid={`btn-conv-menu-${conv.id}`}
+                    >
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                    <DropdownMenuItem onClick={() => openRename(conv)} data-testid={`btn-rename-${conv.id}`}>
+                  <DropdownMenuContent align="end" onClick={e => e.stopPropagation()} className="glass border-white/10">
+                    <DropdownMenuItem onClick={() => openRename(conv)}>
                       <Edit2 className="w-4 h-4 mr-2" /> Rename
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversation(conv.id, { pinned: !conv.pinned })} data-testid={`btn-pin-${conv.id}`}>
+                    <DropdownMenuItem onClick={() => updateConversation(conv.id, { pinned: !conv.pinned })}>
                       <Pin className="w-4 h-4 mr-2" /> {conv.pinned ? 'Unpin' : 'Pin'}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => updateConversation(conv.id, { archived: !conv.archived })}>
                       <Archive className="w-4 h-4 mr-2" /> {conv.archived ? 'Unarchive' : 'Archive'}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setDeleteId(conv.id)} className="text-destructive" data-testid={`btn-delete-conv-${conv.id}`}>
+                    <DropdownMenuItem onClick={() => setDeleteId(conv.id)} className="text-destructive">
                       <Trash2 className="w-4 h-4 mr-2" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -142,12 +149,18 @@ export default function Conversations() {
       )}
 
       <Dialog open={!!renameId} onOpenChange={open => !open && setRenameId(null)}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm glass-strong border-white/10">
           <DialogHeader><DialogTitle>Rename Conversation</DialogTitle></DialogHeader>
-          <Input value={renameValue} onChange={e => setRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitRename()} data-testid="input-rename-conv" autoFocus />
+          <Input
+            value={renameValue}
+            onChange={e => setRenameValue(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submitRename()}
+            className="glass-input border-white/10"
+            autoFocus
+          />
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" onClick={() => setRenameId(null)}>Cancel</Button>
-            <Button onClick={submitRename} data-testid="btn-confirm-rename">Rename</Button>
+            <Button onClick={submitRename}>Rename</Button>
           </div>
         </DialogContent>
       </Dialog>
