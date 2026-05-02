@@ -8,13 +8,13 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Personal preference': 'bg-violet-500/15 text-violet-400 border-violet-500/20',
-  'Project': 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  'App idea': 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
-  'Coding': 'bg-green-500/15 text-green-400 border-green-500/20',
-  'Workflow': 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  'Contact': 'bg-pink-500/15 text-pink-400 border-pink-500/20',
-  'General': 'bg-slate-500/15 text-slate-400 border-slate-500/20',
+  'Personal preference': 'bg-violet-500/15 text-violet-500 border-violet-500/25',
+  'Project': 'bg-blue-500/15 text-blue-500 border-blue-500/25',
+  'App idea': 'bg-cyan-500/15 text-cyan-500 border-cyan-500/25',
+  'Coding': 'bg-green-500/15 text-green-600 border-green-500/25',
+  'Workflow': 'bg-amber-500/15 text-amber-600 border-amber-500/25',
+  'Contact': 'bg-pink-500/15 text-pink-500 border-pink-500/25',
+  'General': 'bg-slate-500/15 text-slate-500 border-slate-500/25',
 };
 
 interface MemoryCardProps {
@@ -39,7 +39,7 @@ export function MemoryCard({ memory, onToggle, onEdit, onDelete }: MemoryCardPro
               {memory.category}
             </span>
             {memory.tags.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs py-0 px-1.5 glass border-white/10">{tag}</Badge>
+              <Badge key={tag} variant="outline" className="text-xs py-0 px-1.5">{tag}</Badge>
             ))}
           </div>
           <h3 className="font-semibold text-sm text-foreground">{memory.title}</h3>
@@ -61,11 +61,11 @@ export function MemoryCard({ memory, onToggle, onEdit, onDelete }: MemoryCardPro
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 glass rounded-lg">
+              <Button size="icon" variant="ghost" className="h-7 w-7 rounded-lg">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="glass border-white/10">
+            <DropdownMenuContent align="end" className="glass-card">
               <DropdownMenuItem onClick={() => onEdit(memory)}>
                 <Edit className="w-4 h-4 mr-2" /> Edit
               </DropdownMenuItem>
