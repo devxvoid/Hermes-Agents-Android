@@ -1,0 +1,385 @@
+name: Build Hermes Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_VERSION: "24"
+      JAVA_VERSION: "21"
+      PORT: "4173"
+      BASE_PATH: "/"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+
+      - name: Patch Hermes app for Android
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          src = Path("artifacts/hermes/src")
+
+          # Fix Chat.tsx TypeScript null errors
+          chat = src / "pages" / "Chat.tsx"
+          if chat.exists():
+              text = chat.read_text()
+              text = text.replace("updateConversation(convId,", "updateConversation(convId!,")
+              text = text.replace("selectedAgent)", "(selectedAgent ?? \"\")")
+              text = text.replace("selectedAgent,", "(selectedAgent ?? \"\"),")
+              chat.write_text(text)
+
+          # Add runtime theme fixer
+          theme_fix = src / "theme-runtime-fix.ts"
+          theme_fix.write_text(r'''
+          export function applyHermesTheme(theme?: string) {
+            const root = document.documentElement;
+            const body = document.body;
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            const selectedTheme = theme || "dark";
+            const isDark = selectedTheme === "dark" || (selectedTheme === "system" && prefersDark);
+
+            root.classList.remove("light", "dark");
+            body.classList.remove("light", "dark");
+
+            root.classList.add(isDark ? "dark" : "light");
+            body.classList.add(isDark ? "dark" : "light");
+
+            root.setAttribute("data-theme", isDark ? "dark" : "light");
+            body.setAttribute("data-theme", isDark ? "dark" : "light");
+
+            root.style.colorScheme = isDark ? "dark" : "light";
+          }
+
+          export function installHermesThemeWatcher() {
+            const readTheme = () => {
+              const possibleKeys = [
+                "hermes-settings",
+                "settings",
+                "app-settings",
+                "hermes-agent-settings"
+              ];
+
+              for (const key of possibleKeys) {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+
+                try {
+                  const parsed = JSON.parse(raw);
+                  if (parsed?.theme) return parsed.theme;
+                  if (parsed?.settings?.theme) return parsed.settings.theme;
+                } catch {}
+              }
+
+              return localStorage.getItem("theme") || "dark";
+            };
+
+            applyHermesTheme(readTheme());
+
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key: string, value: string) {
+              originalSetItem.apply(this, [key, value]);
+              setTimeout(() => applyHermesTheme(readTheme()), 0);
+            };
+
+            window.addEventListener("storage", () => {
+              applyHermesTheme(readTheme());
+            });
+
+            window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+              applyHermesTheme(readTheme());
+            });
+          }
+          ''')
+
+          # Inject runtime fixer into React entry
+          entry = None
+          for name in ["main.tsx", "main.ts", "index.tsx", "index.ts"]:
+              p = src / name
+              if p.exists():
+                  entry = p
+                  break
+
+          if not entry:
+              raise SystemExit("React entry file not found in artifacts/hermes/src")
+
+          text = entry.read_text()
+          if "installHermesThemeWatcher" not in text:
+              text = 'import { installHermesThemeWatcher } from "./theme-runtime-fix";\ninstallHermesThemeWatcher();\n' + text
+              entry.write_text(text)
+
+          # Add strong mobile + theme CSS patch
+          css = src / "index.css"
+          if css.exists():
+              text = css.read_text()
+              patch = r'''
+
+          /* Hermes Android Runtime Theme Fix */
+          html.light,
+          html.light body,
+          html.light #root,
+          [data-theme="light"],
+          [data-theme="light"] body,
+          [data-theme="light"] #root {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+            color-scheme: light !important;
+          }
+
+          html.dark,
+          html.dark body,
+          html.dark #root,
+          [data-theme="dark"],
+          [data-theme="dark"] body,
+          [data-theme="dark"] #root {
+            background: #020617 !important;
+            color: #f8fafc !important;
+            color-scheme: dark !important;
+          }
+
+          html.light .bg-slate-950,
+          html.light .bg-slate-900,
+          html.light .bg-gray-950,
+          html.light .bg-gray-900,
+          html.light .bg-neutral-950,
+          html.light .bg-neutral-900,
+          html.light .bg-zinc-950,
+          html.light .bg-zinc-900,
+          [data-theme="light"] .bg-slate-950,
+          [data-theme="light"] .bg-slate-900,
+          [data-theme="light"] .bg-gray-950,
+          [data-theme="light"] .bg-gray-900,
+          [data-theme="light"] .bg-neutral-950,
+          [data-theme="light"] .bg-neutral-900,
+          [data-theme="light"] .bg-zinc-950,
+          [data-theme="light"] .bg-zinc-900 {
+            background-color: #f8fafc !important;
+          }
+
+          html.light .bg-slate-800,
+          html.light .bg-gray-800,
+          html.light .bg-neutral-800,
+          html.light .bg-zinc-800,
+          [data-theme="light"] .bg-slate-800,
+          [data-theme="light"] .bg-gray-800,
+          [data-theme="light"] .bg-neutral-800,
+          [data-theme="light"] .bg-zinc-800 {
+            background-color: #ffffff !important;
+          }
+
+          html.light .text-white,
+          html.light .text-slate-50,
+          html.light .text-slate-100,
+          html.light .text-gray-50,
+          html.light .text-gray-100,
+          [data-theme="light"] .text-white,
+          [data-theme="light"] .text-slate-50,
+          [data-theme="light"] .text-slate-100,
+          [data-theme="light"] .text-gray-50,
+          [data-theme="light"] .text-gray-100 {
+            color: #0f172a !important;
+          }
+
+          html.light .text-slate-400,
+          html.light .text-gray-400,
+          html.light .text-neutral-400,
+          [data-theme="light"] .text-slate-400,
+          [data-theme="light"] .text-gray-400,
+          [data-theme="light"] .text-neutral-400 {
+            color: #64748b !important;
+          }
+
+          html.light .border-slate-800,
+          html.light .border-gray-800,
+          html.light .border-neutral-800,
+          [data-theme="light"] .border-slate-800,
+          [data-theme="light"] .border-gray-800,
+          [data-theme="light"] .border-neutral-800 {
+            border-color: #dbe3ef !important;
+          }
+
+          html.light input,
+          html.light textarea,
+          html.light select,
+          [data-theme="light"] input,
+          [data-theme="light"] textarea,
+          [data-theme="light"] select {
+            background: #ffffff !important;
+            color: #0f172a !important;
+          }
+
+          html,
+          body,
+          #root {
+            min-height: 100%;
+            overscroll-behavior: none;
+          }
+
+          body {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+          }
+
+          #root {
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+          }
+          '''
+              if "Hermes Android Runtime Theme Fix" not in text:
+                  css.write_text(text + patch)
+
+          print("Hermes Android patches completed")
+          PY
+
+      - name: Typecheck workspace
+        run: |
+          pnpm run typecheck 2>&1 | tee typecheck.log
+
+      - name: Build Hermes web app
+        run: |
+          pnpm --filter @workspace/hermes run build 2>&1 | tee web-build.log
+
+      - name: Install Capacitor
+        run: |
+          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android 2>&1 | tee capacitor-install.log
+
+      - name: Create Capacitor config
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.mrrobot.hermesagents",
+            "appName": "Hermes Agents",
+            "webDir": "artifacts/hermes/dist/public",
+            "bundledWebRuntime": false,
+            "android": {
+              "allowMixedContent": true,
+              "backgroundColor": "#020617"
+            }
+          }
+          EOF
+
+      - name: Generate Android project
+        run: |
+          if [ -d "android" ]; then
+            pnpm exec cap sync android 2>&1 | tee cap-sync-existing.log
+          else
+            pnpm exec cap add android 2>&1 | tee cap-add.log
+            pnpm exec cap sync android 2>&1 | tee cap-sync.log
+          fi
+
+      - name: Patch Android project
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if manifest.exists():
+              text = manifest.read_text()
+              if 'android:usesCleartextTraffic=' not in text:
+                  text = text.replace(
+                      '<application',
+                      '<application android:usesCleartextTraffic="true" android:hardwareAccelerated="true"'
+                  )
+              manifest.write_text(text)
+
+          strings = Path("android/app/src/main/res/values/strings.xml")
+          if strings.exists():
+              text = strings.read_text()
+              text = text.replace("Hermes Agents", "Hermes Agents")
+              strings.write_text(text)
+
+          print("Android project patched")
+          PY
+
+      - name: Make Gradle executable
+        run: |
+          chmod +x android/gradlew
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug --stacktrace --info 2>&1 | tee ../gradle-build.log
+
+      - name: Collect APK
+        if: always()
+        run: |
+          mkdir -p output
+
+          echo "Searching APK files..."
+          find android -type f -name "*.apk" 2>/dev/null | tee apk-files.log || true
+
+          APK_PATH="$(find android -type f -name "*.apk" 2>/dev/null | head -n 1 || true)"
+
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found."
+            echo "Listing Android build files..."
+            find android -type f 2>/dev/null | grep -E "outputs|apk|bundle|build" | tee android-build-files.log || true
+            exit 1
+          fi
+
+          echo "Found APK: $APK_PATH"
+          cp "$APK_PATH" output/Hermes-Agents-debug.apk
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp *.log logs/ 2>/dev/null || true
+          find android -type f -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
+
+          if [ -d "android/app/build/reports" ]; then
+            cp -r android/app/build/reports logs/gradle-reports
+          fi
+
+          echo "Collected logs:"
+          find logs -type f || true
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-Agents-debug-apk
+          path: output/Hermes-Agents-debug.apk
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-Agents-build-logs
+          path: |
+            logs
+            *.log
+          if-no-files-found: warn
