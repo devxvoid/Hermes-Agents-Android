@@ -2,6 +2,19 @@ export interface Conversation { id: string; title: string; messages: Message[]; 
 export interface Message { id: string; role: "user" | "assistant"; content: string; createdAt: string; usedMemoryIds?: string[]; triggeredSkillIds?: string[]; metadata?: AIRequestMetadata; }
 export interface Memory { id: string; title: string; content: string; category: string; tags: string[]; active: boolean; createdAt: string; updatedAt: string; lastUsedAt?: string; usageCount: number; }
 export interface Skill { id: string; name: string; description: string; category: string; triggerKeywords: string[]; instructionPrompt: string; enabled: boolean; createdAt: string; updatedAt: string; lastUsedAt?: string; usageCount: number; }
-export interface AppSettings { agentName: string; responseStyle: "concise"|"balanced"|"detailed"; useMemoryByDefault: boolean; activateSkillsByDefault: boolean; theme: "dark"|"light"|"system"; streamingEnabled: boolean; activeProviderId?: string; activeModelId?: string; }
+export type ThemeColor = "dynamic" | "ocean" | "purple" | "forest" | "slate" | "rose";
+export interface AppSettings {
+  agentName: string;
+  responseStyle: "concise" | "balanced" | "detailed";
+  useMemoryByDefault: boolean;
+  activateSkillsByDefault: boolean;
+  theme: "dark" | "light" | "system";
+  themeColor: ThemeColor;
+  amoledBlack: boolean;
+  systemFont: boolean;
+  streamingEnabled: boolean;
+  activeProviderId?: string;
+  activeModelId?: string;
+}
 export interface AIProviderConfig { id: string; name: string; type: "openai-compatible"|"anthropic"|"gemini"|"custom-rest"|"local-openai-compatible"; mode: "online"|"local"; apiKey?: string; baseUrl: string; selectedModel: string; customModels: string[]; enabled: boolean; supportsStreaming: boolean; supportsSystemPrompt: boolean; status: "not_configured"|"connected"|"error"|"testing"; lastTestedAt?: string; createdAt: string; updatedAt: string; }
 export interface AIRequestMetadata { providerId: string; providerName: string; model: string; mode: "online"|"local"|"demo"; latencyMs?: number; usedMemoryIds: string[]; triggeredSkillIds: string[]; streaming: boolean; error?: string; }

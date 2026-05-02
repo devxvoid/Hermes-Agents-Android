@@ -11,8 +11,8 @@ function StatCard({ label, value, icon: Icon, accent }: { label: string; value: 
         <Icon className="w-5 h-5" />
       </div>
       <div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+        <div className="text-xl font-bold tabular-nums">{value}</div>
+        <div className="text-xs text-muted-foreground mt-0.5 leading-tight">{label}</div>
       </div>
     </div>
   );
@@ -29,61 +29,68 @@ export default function Dashboard() {
   const configuredProviders = providers.filter(p => p.status === 'connected').length;
 
   const quickActions = [
-    { label: 'New Chat',     icon: MessageSquare, href: '/chat',      color: 'bg-primary/12 text-primary border-primary/20'        },
-    { label: 'Add Memory',   icon: Brain,         href: '/memory',    color: 'bg-cyan-500/12 text-cyan-400 border-cyan-500/20'     },
-    { label: 'Create Skill', icon: Zap,           href: '/skills',    color: 'bg-violet-500/12 text-violet-400 border-violet-500/20'},
-    { label: 'Configure AI', icon: Cpu,           href: '/ai-models', color: 'bg-amber-500/12 text-amber-400 border-amber-500/20'  },
+    { label: 'New Chat',     icon: MessageSquare, href: '/chat',      color: 'bg-primary/12 text-primary border-primary/20'          },
+    { label: 'Add Memory',   icon: Brain,         href: '/memory',    color: 'bg-cyan-500/12 text-cyan-500 border-cyan-500/20'       },
+    { label: 'Create Skill', icon: Zap,           href: '/skills',    color: 'bg-violet-500/12 text-violet-500 border-violet-500/20' },
+    { label: 'Configure AI', icon: Cpu,           href: '/ai-models', color: 'bg-amber-500/12 text-amber-500 border-amber-500/20'    },
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
+    <div className="max-w-4xl mx-auto px-4 pt-6 pb-5 space-y-5">
 
       {/* ── Hero ── */}
       <div className="glass-strong rounded-3xl p-5 relative overflow-hidden glass-shine">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/5 pointer-events-none" />
-        <div className="relative flex items-start justify-between flex-wrap gap-4">
+
+        <div className="relative flex items-center gap-4 mb-4">
+          {/* App icon — squircle */}
+          <div className="app-icon">
+            <span className="text-white font-extrabold text-2xl tracking-tight select-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>H</span>
+          </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h1 className="text-2xl font-bold">{settings.agentName}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground leading-none">
+              {settings.agentName}
+            </h1>
+            <div className="flex items-center gap-2 mt-1.5">
               <span className={cn(
-                'text-xs px-2.5 py-1 rounded-full border font-medium',
+                'text-xs px-2.5 py-0.5 rounded-full border font-semibold',
                 activeProvider
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                  : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                  ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25'
+                  : 'bg-amber-500/15 text-amber-500 border-amber-500/25'
               )}>
                 {activeProvider ? 'Online' : 'Demo Mode'}
               </span>
+              {activeProvider && (
+                <span className="text-xs text-muted-foreground truncate">
+                  {activeProvider.selectedModel}
+                </span>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              Autonomous assistant for research, task management, data analysis, and agent orchestration.
-            </p>
-            {activeProvider && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Active: <span className="text-foreground font-medium">{activeProvider.selectedModel}</span>
-                {' '}via {activeProvider.name}
-              </p>
-            )}
           </div>
           <Link
             href="/chat"
-            className="btn-pill flex items-center gap-2 px-4 py-2.5 text-sm font-medium shrink-0"
+            className="btn-pill flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shrink-0 ml-auto"
           >
             <Plus className="w-4 h-4" /> New Chat
           </Link>
         </div>
+
+        <p className="text-sm text-muted-foreground leading-relaxed relative">
+          Autonomous assistant for research, task management, data analysis, and agent orchestration.
+        </p>
       </div>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Conversations"  value={conversations.length}     icon={MessageSquare} accent="bg-primary/15 text-primary"         />
-        <StatCard label="Active Memories" value={activeMemories.length}    icon={Brain}         accent="bg-cyan-500/15 text-cyan-400"       />
-        <StatCard label="Active Skills"  value={enabledSkills.length}     icon={Zap}           accent="bg-violet-500/15 text-violet-400"   />
-        <StatCard label="AI Models"      value={configuredProviders}       icon={Cpu}           accent="bg-amber-500/15 text-amber-400"     />
+        <StatCard label="Conversations"   value={conversations.length}     icon={MessageSquare} accent="bg-primary/15 text-primary"          />
+        <StatCard label="Active Memories" value={activeMemories.length}    icon={Brain}         accent="bg-cyan-500/15 text-cyan-500"        />
+        <StatCard label="Active Skills"   value={enabledSkills.length}     icon={Zap}           accent="bg-violet-500/15 text-violet-500"    />
+        <StatCard label="AI Models"       value={configuredProviders}       icon={Cpu}           accent="bg-amber-500/15 text-amber-500"      />
       </div>
 
       {/* ── Quick Actions ── */}
       <div>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</h2>
+        <p className="settings-section-header" style={{ marginTop: 0 }}>Quick Actions</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickActions.map(({ label, icon: Icon, href, color }) => (
             <Link
@@ -96,20 +103,19 @@ export default function Dashboard() {
               )}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-xs font-medium text-center leading-tight">{label}</span>
+              <span className="text-xs font-semibold text-center leading-tight">{label}</span>
             </Link>
           ))}
         </div>
       </div>
 
-      {/* ── Bottom 2-col ── */}
+      {/* ── Recent + Memory ── */}
       <div className="grid md:grid-cols-2 gap-4">
 
-        {/* Recent Conversations */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Chats</h2>
-            <Link href="/conversations" className="text-xs text-primary hover:underline flex items-center gap-1">
+            <p className="settings-section-header" style={{ marginTop: 0, marginBottom: 0 }}>Recent Chats</p>
+            <Link href="/conversations" className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
               View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -117,7 +123,7 @@ export default function Dashboard() {
             <div className="glass-card rounded-2xl p-6 text-center">
               <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">No conversations yet.</p>
-              <Link href="/chat" className="text-sm text-primary hover:underline mt-1 inline-block">
+              <Link href="/chat" className="text-sm text-primary hover:underline mt-1 inline-block font-medium">
                 Start your first chat →
               </Link>
             </div>
@@ -150,11 +156,10 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Memory Highlights */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Memory Highlights</h2>
-            <Link href="/memory" className="text-xs text-primary hover:underline flex items-center gap-1">
+            <p className="settings-section-header" style={{ marginTop: 0, marginBottom: 0 }}>Memory Highlights</p>
+            <Link href="/memory" className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
               View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -162,7 +167,7 @@ export default function Dashboard() {
             <div className="glass-card rounded-2xl p-6 text-center">
               <Brain className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">No active memories.</p>
-              <Link href="/memory" className="text-sm text-primary hover:underline mt-1 inline-block">
+              <Link href="/memory" className="text-sm text-primary hover:underline mt-1 inline-block font-medium">
                 Add your first memory →
               </Link>
             </div>
@@ -171,10 +176,10 @@ export default function Dashboard() {
               {activeMemories.slice(0, 4).map(mem => (
                 <div key={mem.id} className="glass-card rounded-2xl p-3 flex items-start gap-2">
                   <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                    <Brain className="w-3.5 h-3.5 text-cyan-500" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{mem.title}</div>
+                    <div className="text-sm font-semibold truncate">{mem.title}</div>
                     <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{mem.content}</div>
                   </div>
                 </div>
@@ -188,8 +193,8 @@ export default function Dashboard() {
       {enabledSkills.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Skills</h2>
-            <Link href="/skills" className="text-xs text-primary hover:underline flex items-center gap-1">
+            <p className="settings-section-header" style={{ marginTop: 0, marginBottom: 0 }}>Active Skills</p>
+            <Link href="/skills" className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
               Manage <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -198,7 +203,7 @@ export default function Dashboard() {
               <span
                 key={skill.id}
                 data-testid={`skill-badge-${skill.id}`}
-                className="text-xs glass-card border-violet-500/20 text-violet-400 px-3 py-1 rounded-full font-medium"
+                className="text-xs glass-card border-violet-500/20 text-violet-500 px-3 py-1 rounded-full font-semibold"
               >
                 {skill.name}
               </span>

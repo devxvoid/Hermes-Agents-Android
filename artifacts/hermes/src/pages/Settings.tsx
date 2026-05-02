@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { ThemeColor } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +9,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Trash2, Key, RotateCcw, Shield, Moon, Sun, Monitor } from 'lucide-react';
+import { Download, Upload, Trash2, Key, RotateCcw, Shield, Moon, Sun, Monitor, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+/* ── Theme colour swatches ────────────────────────────── */
+const THEME_COLORS: { id: ThemeColor; label: string; swatch: string }[] = [
+  { id: 'dynamic', label: 'Dynamic', swatch: 'bg-[hsl(200,80%,46%)]' },
+  { id: 'ocean',   label: 'Ocean',   swatch: 'bg-[hsl(185,68%,40%)]' },
+  { id: 'purple',  label: 'Purple',  swatch: 'bg-[hsl(268,62%,52%)]' },
+  { id: 'forest',  label: 'Forest',  swatch: 'bg-[hsl(148,55%,36%)]' },
+  { id: 'slate',   label: 'Slate',   swatch: 'bg-[hsl(213,32%,44%)]' },
+  { id: 'rose',    label: 'Rose',    swatch: 'bg-[hsl(348,70%,48%)]' },
+];
+
+const THEME_MODES = [
+  { value: 'light',  label: 'Light',  icon: Sun   },
+  { value: 'dark',   label: 'Dark',   icon: Moon  },
+  { value: 'system', label: 'System', icon: Monitor },
+] as const;
+
+/* ── Re-usable toggle row ─────────────────────────────── */
+function ToggleRow({
+  title, description, checked, onCheckedChange, testId,
+}: { title: string; description?: string; checked: boolean; onCheckedChange: (v: boolean) => void; testId?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-1">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        {description && <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{description}</div>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} data-testid={testId} className="shrink-0" />
+    </div>
+  );
+}
 
 export default function Settings() {
   const { settings, updateSettings, clearAllData, clearAllApiKeys, exportData, importData } = useApp();
@@ -17,7 +50,6 @@ export default function Settings() {
   const [clearConfirm, setClearConfirm] = useState(false);
   const [keysConfirm, setKeysConfirm] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
-  const [exportIncludeKeys, setExportIncludeKeys] = useState(false);
   const [exportKeyConfirm, setExportKeyConfirm] = useState(false);
 
   const handleExport = (includeKeys = false) => {
@@ -38,8 +70,7 @@ export default function Settings() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target?.result as string);
-        importData(data);
+        importData(JSON.parse(ev.target?.result as string));
         toast({ title: 'Data imported successfully' });
       } catch {
         toast({ title: 'Import failed', description: 'Invalid JSON file.', variant: 'destructive' });
@@ -49,24 +80,105 @@ export default function Settings() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const themeOptions = [
-    { value: 'dark', label: 'Dark', icon: Moon },
-    { value: 'light', label: 'Light', icon: Sun },
-    { value: 'system', label: 'System', icon: Monitor },
-  ];
-
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">Configure Hermes AI Agent</p>
+    <div className="max-w-xl mx-auto px-4 py-6 space-y-1 pb-28 md:pb-8">
+
+      {/* ── Page title ── */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Configure Hermes AI Agent</p>
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-5">
-        <h2 className="font-semibold text-foreground">General</h2>
+      {/* ══════════════════════════════════════
+          APPEARANCE
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">Appearance</p>
 
+      {/* Theme mode tiles */}
+      <div className="glass-card rounded-2xl p-4 space-y-4">
+        <div className="grid grid-cols-3 gap-2">
+          {THEME_MODES.map(({ value, label, icon: Icon }) => {
+            const active = settings.theme === value;
+            return (
+              <button
+                key={value}
+                onClick={() => updateSettings({ theme: value })}
+                data-testid={`btn-theme-${value}`}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-2 rounded-2xl py-4 transition-all border',
+                  active
+                    ? 'bg-primary text-primary-foreground border-primary shadow-lg'
+                    : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <Icon className="w-6 h-6" />
+                <span className="text-sm font-semibold">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Theme colour */}
+      <div className="glass-card rounded-2xl p-4">
+        <p className="text-sm font-semibold text-foreground mb-3">Theme Color</p>
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1">
+          {THEME_COLORS.map(({ id, label, swatch }) => {
+            const active = settings.themeColor === id;
+            return (
+              <button
+                key={id}
+                onClick={() => updateSettings({ themeColor: id })}
+                data-testid={`btn-color-${id}`}
+                className="flex flex-col items-center gap-1.5 shrink-0"
+              >
+                <div className={cn(
+                  'w-12 h-12 rounded-full flex items-center justify-center transition-all',
+                  swatch,
+                  active ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground/30 scale-110' : 'opacity-80 hover:opacity-100 hover:scale-105'
+                )}>
+                  {active && <Check className="w-5 h-5 text-white" strokeWidth={3} />}
+                </div>
+                <span className={cn(
+                  'text-[11px] font-medium transition-colors',
+                  active ? 'text-foreground' : 'text-muted-foreground'
+                )}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* AMOLED */}
+      <div className="glass-card rounded-2xl px-4 py-3.5">
+        <ToggleRow
+          title="AMOLED Black Theme"
+          description="Pure black background for dark mode"
+          checked={settings.amoledBlack}
+          onCheckedChange={v => updateSettings({ amoledBlack: v })}
+          testId="toggle-amoled"
+        />
+      </div>
+
+      {/* System Font */}
+      <div className="glass-card rounded-2xl px-4 py-3.5">
+        <ToggleRow
+          title="System Font"
+          description="Match your device's font for better readability"
+          checked={settings.systemFont}
+          onCheckedChange={v => updateSettings({ systemFont: v })}
+          testId="toggle-system-font"
+        />
+      </div>
+
+      {/* ══════════════════════════════════════
+          GENERAL
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">General</p>
+
+      <div className="glass-card rounded-2xl p-4 space-y-4">
         <div className="space-y-2">
-          <Label>Agent Name</Label>
+          <Label className="text-sm font-semibold">Agent Name</Label>
           <Input
             value={settings.agentName}
             onChange={e => updateSettings({ agentName: e.target.value })}
@@ -75,29 +187,10 @@ export default function Settings() {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Theme</Label>
-          <div className="flex gap-2">
-            {themeOptions.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                onClick={() => updateSettings({ theme: value as 'dark' | 'light' | 'system' })}
-                data-testid={`btn-theme-${value}`}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
-                  settings.theme === value
-                    ? 'bg-primary/15 border-primary/50 text-primary'
-                    : 'border-border text-muted-foreground hover:border-primary/30'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Separator />
 
         <div className="space-y-2">
-          <Label>Response Style</Label>
+          <Label className="text-sm font-semibold">Response Style</Label>
           <Select value={settings.responseStyle} onValueChange={v => updateSettings({ responseStyle: v as any })}>
             <SelectTrigger data-testid="select-response-style"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -109,88 +202,101 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-4">
-        <h2 className="font-semibold text-foreground">AI Behavior</h2>
+      {/* ══════════════════════════════════════
+          AI BEHAVIOUR
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">AI Behaviour</p>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-foreground">Use Memory by Default</div>
-            <div className="text-xs text-muted-foreground">Inject relevant memories into AI context</div>
-          </div>
-          <Switch checked={settings.useMemoryByDefault} onCheckedChange={v => updateSettings({ useMemoryByDefault: v })} data-testid="toggle-use-memory" />
+      <div className="glass-card rounded-2xl px-4 divide-y divide-border/50">
+        <div className="py-3.5">
+          <ToggleRow
+            title="Use Memory by Default"
+            description="Inject relevant memories into AI context"
+            checked={settings.useMemoryByDefault}
+            onCheckedChange={v => updateSettings({ useMemoryByDefault: v })}
+            testId="toggle-use-memory"
+          />
         </div>
-
-        <Separator />
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-foreground">Activate Skills by Default</div>
-            <div className="text-xs text-muted-foreground">Trigger matching skills automatically</div>
-          </div>
-          <Switch checked={settings.activateSkillsByDefault} onCheckedChange={v => updateSettings({ activateSkillsByDefault: v })} data-testid="toggle-activate-skills" />
+        <div className="py-3.5">
+          <ToggleRow
+            title="Activate Skills by Default"
+            description="Trigger matching skills automatically"
+            checked={settings.activateSkillsByDefault}
+            onCheckedChange={v => updateSettings({ activateSkillsByDefault: v })}
+            testId="toggle-activate-skills"
+          />
         </div>
-
-        <Separator />
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-foreground">Streaming</div>
-            <div className="text-xs text-muted-foreground">Stream responses when provider supports it</div>
-          </div>
-          <Switch checked={settings.streamingEnabled} onCheckedChange={v => updateSettings({ streamingEnabled: v })} data-testid="toggle-streaming" />
+        <div className="py-3.5">
+          <ToggleRow
+            title="Streaming"
+            description="Stream responses when provider supports it"
+            checked={settings.streamingEnabled}
+            onCheckedChange={v => updateSettings({ streamingEnabled: v })}
+            testId="toggle-streaming"
+          />
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-4">
-        <h2 className="font-semibold text-foreground">Data & Export</h2>
+      {/* ══════════════════════════════════════
+          DATA
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">Data & Export</p>
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => handleExport(false)} className="flex-1" data-testid="btn-export-data">
-            <Download className="w-4 h-4 mr-2" />Export Data (no keys)
+      <div className="glass-card rounded-2xl p-4 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => handleExport(false)} data-testid="btn-export-data" className="text-xs">
+            <Download className="w-3.5 h-3.5 mr-1.5" />Export (no keys)
           </Button>
-          <Button variant="outline" onClick={() => setExportKeyConfirm(true)} className="flex-1" data-testid="btn-export-with-keys">
-            <Key className="w-4 h-4 mr-2" />Export with Keys
+          <Button variant="outline" onClick={() => setExportKeyConfirm(true)} data-testid="btn-export-with-keys" className="text-xs">
+            <Key className="w-3.5 h-3.5 mr-1.5" />Export with Keys
           </Button>
         </div>
-
-        <Button variant="outline" onClick={() => fileRef.current?.click()} className="w-full" data-testid="btn-import-data">
-          <Upload className="w-4 h-4 mr-2" />Import Data from JSON
+        <Button variant="outline" onClick={() => fileRef.current?.click()} className="w-full text-xs" data-testid="btn-import-data">
+          <Upload className="w-3.5 h-3.5 mr-1.5" />Import Data from JSON
         </Button>
         <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-2">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="w-4 h-4 text-muted-foreground" />
-          <h2 className="font-semibold text-foreground">Privacy & Security</h2>
+      {/* ══════════════════════════════════════
+          PRIVACY
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">Privacy</p>
+
+      <div className="glass-card rounded-2xl p-4 space-y-2">
+        <div className="flex items-start gap-2">
+          <Shield className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            All data is stored locally in your browser. API keys are never sent to Hermes servers — only directly to your configured AI providers.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          All data including conversations, memories, skills, and settings is stored locally in your browser using localStorage. API keys are stored locally and never transmitted to Hermes servers. Online AI requests are sent directly to your configured providers. Local AI requests stay on your local network.
-        </p>
-        <p className="text-xs text-amber-500 mt-2">
+        <p className="text-xs text-amber-500 leading-snug">
           Browser localStorage is not a secure vault. Do not store highly sensitive credentials.
         </p>
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-3">
-        <h2 className="font-semibold text-destructive">Danger Zone</h2>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => setKeysConfirm(true)} className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/5" data-testid="btn-clear-keys">
-            <Key className="w-4 h-4 mr-2" />Clear All API Keys
+      {/* ══════════════════════════════════════
+          DANGER ZONE
+      ══════════════════════════════════════ */}
+      <p className="settings-section-header">Danger Zone</p>
+
+      <div className="glass-card rounded-2xl p-4 space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => setKeysConfirm(true)} className="border-destructive/30 text-destructive hover:bg-destructive/5 text-xs" data-testid="btn-clear-keys">
+            <Key className="w-3.5 h-3.5 mr-1.5" />Clear API Keys
           </Button>
-          <Button variant="outline" onClick={() => setResetConfirm(true)} className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/5" data-testid="btn-reset-defaults">
-            <RotateCcw className="w-4 h-4 mr-2" />Reset to Defaults
+          <Button variant="outline" onClick={() => setResetConfirm(true)} className="border-destructive/30 text-destructive hover:bg-destructive/5 text-xs" data-testid="btn-reset-defaults">
+            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />Reset Defaults
           </Button>
         </div>
-        <Button variant="destructive" onClick={() => setClearConfirm(true)} className="w-full" data-testid="btn-clear-all-data">
-          <Trash2 className="w-4 h-4 mr-2" />Clear All Data
+        <Button variant="destructive" onClick={() => setClearConfirm(true)} className="w-full text-xs" data-testid="btn-clear-all-data">
+          <Trash2 className="w-3.5 h-3.5 mr-1.5" />Clear All Data
         </Button>
       </div>
 
       <ConfirmDialog open={clearConfirm} onOpenChange={setClearConfirm} title="Clear All Data" description="This will permanently delete all conversations, memories, skills, and settings. This cannot be undone." confirmLabel="Clear Everything" variant="destructive" onConfirm={() => { clearAllData(); toast({ title: 'All data cleared' }); }} />
       <ConfirmDialog open={keysConfirm} onOpenChange={setKeysConfirm} title="Clear All API Keys" description="All saved API keys will be removed. Your other data will remain." confirmLabel="Clear Keys" variant="destructive" onConfirm={() => { clearAllApiKeys(); toast({ title: 'All API keys cleared' }); }} />
       <ConfirmDialog open={resetConfirm} onOpenChange={setResetConfirm} title="Reset to Defaults" description="This will clear all your data and restore the default memories, skills, and settings." confirmLabel="Reset" variant="destructive" onConfirm={() => { clearAllData(); toast({ title: 'Reset to defaults' }); }} />
-      <ConfirmDialog open={exportKeyConfirm} onOpenChange={setExportKeyConfirm} title="Export with API Keys" description="This will include your API keys in the export file. Keep it secure. Do not share this file." confirmLabel="Export with Keys" onConfirm={() => { handleExport(true); setExportKeyConfirm(false); }} />
+      <ConfirmDialog open={exportKeyConfirm} onOpenChange={setExportKeyConfirm} title="Export with API Keys" description="This will include your API keys in the export file. Keep it secure — do not share this file." confirmLabel="Export with Keys" onConfirm={() => { handleExport(true); setExportKeyConfirm(false); }} />
     </div>
   );
 }

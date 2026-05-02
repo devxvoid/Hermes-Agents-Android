@@ -43,8 +43,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const rawConvs = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.CONVERSATIONS), []);
-    const loadedConvs = rawConvs.map(normalizeConversation);
-    setConversations(loadedConvs);
+    setConversations(rawConvs.map(normalizeConversation));
 
     const rawMems = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.MEMORIES), []);
     if (rawMems.length === 0) {
@@ -63,8 +62,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const rawSettings = safeJsonParse<any>(localStorage.getItem(StorageKeys.SETTINGS), {});
-    const loadedSettings = normalizeSettings(rawSettings);
-    setSettings(loadedSettings);
+    setSettings(normalizeSettings(rawSettings));
 
     const rawProviders = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.PROVIDERS), []);
     setProviders(rawProviders.map(normalizeProvider));
@@ -72,22 +70,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInitialized(true);
   }, []);
 
+  /* ── Apply theme/appearance classes to <html> ── */
   useEffect(() => {
     if (!initialized) return;
-    const theme = settings.theme;
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else if (theme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  }, [settings.theme, initialized]);
+
+    /* Dark / light / system */
+    const { theme, themeColor, amoledBlack, systemFont } = settings;
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+    root.classList.toggle('dark', isDark);
+
+    /* Theme color palette */
+    root.setAttribute('data-color', themeColor || 'dynamic');
+
+    /* AMOLED pure black */
+    root.classList.toggle('amoled', !!amoledBlack);
+
+    /* System font override */
+    root.classList.toggle('system-font', !!systemFont);
+  }, [settings.theme, settings.themeColor, settings.amoledBlack, settings.systemFont, initialized]);
 
   const addConversation = useCallback((conv: Conversation) => {
     setConversations(prev => {
@@ -218,10 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
-      conversations,
-      memories,
-      skills,
-      settings,
+      conversations, memories, skills, settings,
       providers: includeKeys ? providers : providers.map(p => ({ ...p, apiKey: '' })),
     };
   }, [conversations, memories, skills, settings, providers]);
