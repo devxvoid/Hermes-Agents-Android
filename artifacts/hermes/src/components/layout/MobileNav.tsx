@@ -28,17 +28,15 @@ export function MobileNav() {
           {primaryNav.map(({ path, label, icon: Icon }) => {
             const isActive = path === '/' ? location === '/' : location.startsWith(path);
             return (
-              <Link key={path} href={path}>
-                <a
-                  data-testid={`mobile-nav-${label.toLowerCase()}`}
-                  className={cn(
-                    'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[44px] transition-all',
-                    isActive ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                >
-                  <Icon className={cn('w-5 h-5', isActive && 'text-primary')} />
-                  <span className={cn('text-[10px] font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>{label}</span>
-                </a>
+              <Link key={path} href={path}
+                data-testid={`mobile-nav-${label.toLowerCase()}`}
+                className={cn(
+                  'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[44px] transition-all',
+                  isActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <Icon className={cn('w-5 h-5', isActive && 'text-primary')} />
+                <span className={cn('text-[10px] font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>{label}</span>
               </Link>
             );
           })}
@@ -60,14 +58,12 @@ export function MobileNav() {
           </SheetHeader>
           <div className="space-y-1 pb-6">
             {moreNav.map(({ path, label, icon: Icon }) => (
-              <Link key={path} href={path}>
-                <a
-                  onClick={() => setMoreOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors"
-                >
-                  <Icon className="w-5 h-5 text-muted-foreground" />
-                  <span className="font-medium">{label}</span>
-                </a>
+              <Link key={path} href={path}
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+              >
+                <Icon className="w-5 h-5 text-muted-foreground" />
+                <span className="font-medium">{label}</span>
               </Link>
             ))}
           </div>
