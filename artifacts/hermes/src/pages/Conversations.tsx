@@ -66,13 +66,13 @@ export default function Conversations() {
           placeholder="Search conversations..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="pl-9 glass-input border-white/10"
+          className="pl-9 glass-input"
           data-testid="input-search-conversations"
         />
       </div>
 
       <Tabs value={filter} onValueChange={v => setFilter(v as Filter)}>
-        <TabsList className="glass border-white/10">
+        <TabsList>
           <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
           <TabsTrigger value="pinned" data-testid="tab-pinned">Pinned</TabsTrigger>
           <TabsTrigger value="archived" data-testid="tab-archived">Archived</TabsTrigger>
@@ -96,7 +96,7 @@ export default function Conversations() {
               onClick={() => setLocation(`/chat/${conv.id}`)}
             >
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl glass flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
                   <MessageSquare className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -104,7 +104,7 @@ export default function Conversations() {
                     {conv.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
                     <span className="font-medium text-foreground text-sm truncate">{conv.title}</span>
                     {conv.archived && (
-                      <span className="text-xs text-muted-foreground glass px-1.5 py-0.5 rounded shrink-0">Archived</span>
+                      <span className="text-xs text-muted-foreground bg-muted/50 border border-border px-1.5 py-0.5 rounded shrink-0">Archived</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
@@ -120,13 +120,13 @@ export default function Conversations() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0 glass"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0"
                       data-testid={`btn-conv-menu-${conv.id}`}
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={e => e.stopPropagation()} className="glass border-white/10">
+                  <DropdownMenuContent align="end" onClick={e => e.stopPropagation()} className="glass-card">
                     <DropdownMenuItem onClick={() => openRename(conv)}>
                       <Edit2 className="w-4 h-4 mr-2" /> Rename
                     </DropdownMenuItem>
@@ -149,13 +149,13 @@ export default function Conversations() {
       )}
 
       <Dialog open={!!renameId} onOpenChange={open => !open && setRenameId(null)}>
-        <DialogContent className="sm:max-w-sm glass-strong border-white/10">
+        <DialogContent className="sm:max-w-sm glass-strong">
           <DialogHeader><DialogTitle>Rename Conversation</DialogTitle></DialogHeader>
           <Input
             value={renameValue}
             onChange={e => setRenameValue(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitRename()}
-            className="glass-input border-white/10"
+            className="glass-input"
             autoFocus
           />
           <div className="flex justify-end gap-2 mt-2">

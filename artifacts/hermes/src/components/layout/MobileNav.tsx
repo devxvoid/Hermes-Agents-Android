@@ -62,7 +62,7 @@ export function MobileNav() {
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl glass-strong border-white/10 border-x-0 border-b-0">
+        <SheetContent side="bottom" className="rounded-t-3xl glass-strong border-x-0 border-b-0">
           <SheetHeader className="pb-4">
             <SheetTitle className="text-base">More</SheetTitle>
           </SheetHeader>
@@ -72,7 +72,7 @@ export function MobileNav() {
                 key={path}
                 href={path}
                 onClick={() => setMoreOpen(false)}
-                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-white/[0.06] transition-colors"
+                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-foreground/[0.06] transition-colors"
               >
                 <div className="w-9 h-9 rounded-xl glass-card flex items-center justify-center">
                   <Icon className="w-4 h-4 text-primary" />

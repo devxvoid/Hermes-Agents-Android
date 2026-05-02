@@ -44,7 +44,7 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
           onClick={onNewChat}
           data-testid="btn-new-chat"
           title="New chat"
-          className="shrink-0 w-10 h-10 rounded-full glass-card border-white/10 flex items-center justify-center hover:border-primary/30 transition-all"
+          className="shrink-0 w-10 h-10 rounded-full glass-card flex items-center justify-center hover:border-primary/30 transition-all"
         >
           <Plus className="w-4 h-4 text-muted-foreground" />
         </button>
@@ -74,7 +74,7 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
               'shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all',
               value.trim() && !disabled
                 ? 'bg-primary text-primary-foreground glow-primary hover:opacity-90'
-                : 'bg-white/10 text-muted-foreground cursor-not-allowed'
+                : 'bg-foreground/10 text-muted-foreground cursor-not-allowed'
             )}
           >
             <Send className="w-3.5 h-3.5" />

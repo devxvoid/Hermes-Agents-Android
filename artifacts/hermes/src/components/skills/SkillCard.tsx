@@ -25,17 +25,17 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete }: SkillCardProps)
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center shrink-0',
               skill.enabled ? 'bg-violet-500/20' : 'bg-muted/40')}>
-              <Zap className={cn('w-3.5 h-3.5', skill.enabled ? 'text-violet-400' : 'text-muted-foreground')} />
+              <Zap className={cn('w-3.5 h-3.5', skill.enabled ? 'text-violet-500' : 'text-muted-foreground')} />
             </div>
             <h3 className="font-semibold text-sm text-foreground">{skill.name}</h3>
-            <Badge variant="outline" className="text-xs py-0 px-1.5 glass border-white/10 ml-auto shrink-0">
+            <Badge variant="outline" className="text-xs py-0 px-1.5 ml-auto shrink-0">
               {skill.category}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-2">{skill.description}</p>
           <div className="flex flex-wrap gap-1 mt-2">
             {skill.triggerKeywords.slice(0, 5).map(kw => (
-              <span key={kw} className="text-xs glass border-primary/20 text-primary/80 px-1.5 py-0.5 rounded-md">{kw}</span>
+              <span key={kw} className="text-xs bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded-md">{kw}</span>
             ))}
             {skill.triggerKeywords.length > 5 && (
               <span className="text-xs text-muted-foreground">+{skill.triggerKeywords.length - 5}</span>
@@ -55,11 +55,11 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete }: SkillCardProps)
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7 glass rounded-lg">
+              <Button size="icon" variant="ghost" className="h-7 w-7 rounded-lg">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="glass border-white/10">
+            <DropdownMenuContent align="end" className="glass-card">
               <DropdownMenuItem onClick={() => onEdit(skill)}>
                 <Edit className="w-4 h-4 mr-2" /> Edit
               </DropdownMenuItem>

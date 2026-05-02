@@ -62,7 +62,7 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Configure Hermes AI Agent</p>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
+      <div className="glass-card rounded-xl p-5 space-y-5">
         <h2 className="font-semibold text-foreground">General</h2>
 
         <div className="space-y-2">
@@ -109,7 +109,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+      <div className="glass-card rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-foreground">AI Behavior</h2>
 
         <div className="flex items-center justify-between">
@@ -141,7 +141,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+      <div className="glass-card rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-foreground">Data & Export</h2>
 
         <div className="flex flex-col sm:flex-row gap-2">
@@ -159,7 +159,7 @@ export default function Settings() {
         <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-2">
+      <div className="glass-card rounded-xl p-5 space-y-2">
         <div className="flex items-center gap-2 mb-3">
           <Shield className="w-4 h-4 text-muted-foreground" />
           <h2 className="font-semibold text-foreground">Privacy & Security</h2>
@@ -167,12 +167,12 @@ export default function Settings() {
         <p className="text-xs text-muted-foreground leading-relaxed">
           All data including conversations, memories, skills, and settings is stored locally in your browser using localStorage. API keys are stored locally and never transmitted to Hermes servers. Online AI requests are sent directly to your configured providers. Local AI requests stay on your local network.
         </p>
-        <p className="text-xs text-amber-400 mt-2">
+        <p className="text-xs text-amber-500 mt-2">
           Browser localStorage is not a secure vault. Do not store highly sensitive credentials.
         </p>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-5 space-y-3">
+      <div className="glass-card rounded-xl p-5 space-y-3">
         <h2 className="font-semibold text-destructive">Danger Zone</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={() => setKeysConfirm(true)} className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/5" data-testid="btn-clear-keys">

@@ -23,7 +23,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 h-screen sticky top-0 shrink-0 glass-sidebar">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/[0.05]">
+      <div className="px-5 py-5 border-b border-border/20">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
             <span className="text-primary font-bold text-sm">H</span>
@@ -32,8 +32,8 @@ export function Sidebar() {
             <div className="font-semibold text-sm text-sidebar-foreground">{settings.agentName}</div>
             <div className="text-[11px] truncate mt-0.5">
               {activeProvider
-                ? <span className="text-emerald-400">{activeProvider.selectedModel}</span>
-                : <span className="text-amber-400/80">Demo Mode</span>}
+                ? <span className="text-emerald-500">{activeProvider.selectedModel}</span>
+                : <span className="text-amber-500">Demo Mode</span>}
             </div>
           </div>
         </div>
@@ -52,7 +52,7 @@ export function Sidebar() {
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group',
                 isActive
                   ? 'bg-primary/12 text-primary border border-primary/20'
-                  : 'text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-white/[0.05] border border-transparent'
+                  : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-foreground/[0.06] border border-transparent'
               )}
             >
               <Icon className={cn(
@@ -66,7 +66,7 @@ export function Sidebar() {
       </nav>
 
       {/* Status footer */}
-      <div className="px-3 py-4 border-t border-white/[0.05]">
+      <div className="px-3 py-4 border-t border-border/20">
         <div className="px-3 py-2.5 rounded-xl glass-card">
           <div className="flex items-center gap-2">
             <span className={cn(
@@ -77,7 +77,7 @@ export function Sidebar() {
             )} />
             <span className={cn(
               'text-xs font-medium',
-              activeProvider ? 'text-emerald-400' : 'text-amber-400'
+              activeProvider ? 'text-emerald-500' : 'text-amber-500'
             )}>
               {activeProvider ? activeProvider.name : 'Demo Mode'}
             </span>

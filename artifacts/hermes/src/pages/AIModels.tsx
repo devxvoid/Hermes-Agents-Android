@@ -138,7 +138,7 @@ function ProviderCard({ preset }: { preset: typeof ONLINE_PROVIDERS[0] }) {
   const allModels = [...new Set([...preset.models, ...fetchedModels])];
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-4 space-y-3" data-testid={`provider-card-${preset.name}`}>
+    <div className="glass-card rounded-xl p-4 space-y-3" data-testid={`provider-card-${preset.name}`}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-foreground text-sm">{preset.name}</h3>
@@ -271,7 +271,7 @@ function LocalRuntimeCard({ runtime }: { runtime: typeof LOCAL_RUNTIMES[0] }) {
   };
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-4 space-y-3" data-testid={`local-runtime-${runtime.name}`}>
+    <div className="glass-card rounded-xl p-4 space-y-3" data-testid={`local-runtime-${runtime.name}`}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-sm text-foreground">{runtime.name}</h3>
@@ -333,7 +333,7 @@ function ActiveModelPanel() {
 
   if (!active) {
     return (
-      <div className="bg-card border border-card-border rounded-xl p-6 text-center space-y-3">
+      <div className="glass-card rounded-xl p-6 text-center space-y-3">
         <Cpu className="w-10 h-10 text-muted-foreground mx-auto" />
         <p className="font-medium text-foreground">No active model</p>
         <p className="text-sm text-muted-foreground">Configure an online or local AI provider and set it as active.</p>
@@ -346,7 +346,7 @@ function ActiveModelPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-card border border-card-border rounded-xl p-4 space-y-3">
+      <div className="glass-card rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="font-semibold text-foreground">{active.name}</div>
@@ -424,7 +424,7 @@ function AIModelsContent() {
           </div>
           <div className="grid md:grid-cols-2 gap-3">
             {LOCAL_MODEL_CATALOG.map(m => (
-              <div key={m.modelId} className="bg-card border border-card-border rounded-xl p-4 space-y-2" data-testid={`model-catalog-${m.modelId}`}>
+              <div key={m.modelId} className="glass-card rounded-xl p-4 space-y-2" data-testid={`model-catalog-${m.modelId}`}>
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-medium text-sm text-foreground">{m.name}</div>
@@ -482,7 +482,7 @@ function CustomModelForm() {
   };
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-5 space-y-4 max-w-xl">
+    <div className="glass-card rounded-xl p-5 space-y-4 max-w-xl">
       <h3 className="font-semibold text-foreground">Add Custom Model</h3>
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="space-y-1"><Label className="text-xs">Display Name *</Label><Input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="My Custom Model" data-testid="input-custom-name" /></div>
@@ -520,7 +520,7 @@ function AdvancedSettings() {
   const [sysPrompt, setSysPrompt] = useState("You are Hermes AI Agent, a professional autonomous assistant. Use relevant memories and enabled skills only when they genuinely improve the answer. Do not force memory or skills into casual messages. Be clear, practical, and concise unless the user requests detail.");
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-5 space-y-5 max-w-xl">
+    <div className="glass-card rounded-xl p-5 space-y-5 max-w-xl">
       <h3 className="font-semibold text-foreground">Advanced Settings</h3>
       <div className="space-y-2"><Label className="text-xs">Default Temperature: {temp[0]}</Label><Slider value={temp} onValueChange={setTemp} min={0} max={2} step={0.1} /></div>
       <div className="space-y-2"><Label className="text-xs">Default Max Tokens: {tokens[0]}</Label><Slider value={tokens} onValueChange={setTokens} min={256} max={8192} step={256} /></div>
