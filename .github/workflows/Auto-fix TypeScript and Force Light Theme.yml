@@ -1,0 +1,68 @@
+- name: Auto-fix TypeScript and Force Light Theme
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          chat = Path("artifacts/hermes/src/pages/Chat.tsx")
+          if chat.exists():
+              text = chat.read_text()
+              text = text.replace("updateConversation(convId,", "updateConversation(convId!,")
+              text = text.replace("selectedAgent)", "(selectedAgent ?? \"\")")
+              text = text.replace("selectedAgent,", "(selectedAgent ?? \"\"),")
+              chat.write_text(text)
+
+          for path in Path("artifacts/hermes/src").rglob("*.tsx"):
+              text = path.read_text()
+
+              text = text.replace("bg-slate-950", "bg-white dark:bg-slate-950")
+              text = text.replace("bg-slate-900", "bg-slate-50 dark:bg-slate-900")
+              text = text.replace("bg-gray-950", "bg-white dark:bg-gray-950")
+              text = text.replace("bg-gray-900", "bg-gray-50 dark:bg-gray-900")
+              text = text.replace("text-white", "text-slate-950 dark:text-white")
+              text = text.replace("text-slate-100", "text-slate-900 dark:text-slate-100")
+              text = text.replace("text-gray-100", "text-gray-900 dark:text-gray-100")
+              text = text.replace("border-slate-800", "border-slate-200 dark:border-slate-800")
+              text = text.replace("border-gray-800", "border-gray-200 dark:border-gray-800")
+
+              path.write_text(text)
+
+          css = Path("artifacts/hermes/src/index.css")
+          if css.exists():
+              text = css.read_text()
+              patch = """
+
+          /* Force Light Theme Fix */
+          html:not(.dark),
+          html:not(.dark) body,
+          html:not(.dark) #root {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+          }
+
+          html:not(.dark) .bg-slate-950,
+          html:not(.dark) .bg-slate-900,
+          html:not(.dark) .bg-gray-950,
+          html:not(.dark) .bg-gray-900,
+          html:not(.dark) .bg-neutral-950,
+          html:not(.dark) .bg-neutral-900 {
+            background-color: #f8fafc !important;
+          }
+
+          html:not(.dark) .text-white,
+          html:not(.dark) .text-slate-100,
+          html:not(.dark) .text-gray-100 {
+            color: #0f172a !important;
+          }
+
+          html:not(.dark) input,
+          html:not(.dark) textarea,
+          html:not(.dark) select {
+            background: #ffffff !important;
+            color: #0f172a !important;
+          }
+          """
+              if "Force Light Theme Fix" not in text:
+                  css.write_text(text + patch)
+
+          print("TypeScript and light theme patch complete")
+          PY
