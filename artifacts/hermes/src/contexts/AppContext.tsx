@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Conversation, Memory, Skill, AppSettings, AIProviderConfig } from '../types';
+import { Conversation, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor } from '../types';
 import { StorageKeys, safeJsonParse, normalizeConversation, normalizeMemory, normalizeSkill, normalizeProvider, normalizeSettings, setStorageData } from '../lib/storage';
 import { defaultMemories, defaultSkills } from '../lib/seedData';
 
@@ -31,6 +31,57 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | null>(null);
+
+/* ── Colour palette lookup table (HSL triplets, no hsl() wrapper) ── */
+type PaletteEntry = {
+  light: { primary: string; ring: string; accent: string };
+  dark:  { primary: string; ring: string; accent: string };
+};
+
+const COLOR_PALETTES: Record<ThemeColor, PaletteEntry> = {
+  dynamic: {
+    light: { primary: '200 80% 46%',  ring: '200 80% 46%',  accent: '185 70% 38%' },
+    dark:  { primary: '200 85% 62%',  ring: '200 85% 62%',  accent: '185 75% 55%' },
+  },
+  ocean: {
+    light: { primary: '185 68% 40%',  ring: '185 68% 40%',  accent: '195 70% 44%' },
+    dark:  { primary: '185 72% 54%',  ring: '185 72% 54%',  accent: '195 72% 58%' },
+  },
+  purple: {
+    light: { primary: '268 62% 52%',  ring: '268 62% 52%',  accent: '280 58% 56%' },
+    dark:  { primary: '268 68% 66%',  ring: '268 68% 66%',  accent: '280 65% 70%' },
+  },
+  forest: {
+    light: { primary: '148 55% 36%',  ring: '148 55% 36%',  accent: '158 52% 40%' },
+    dark:  { primary: '148 58% 50%',  ring: '148 58% 50%',  accent: '158 55% 54%' },
+  },
+  slate: {
+    light: { primary: '213 32% 44%',  ring: '213 32% 44%',  accent: '220 30% 48%' },
+    dark:  { primary: '213 32% 62%',  ring: '213 32% 62%',  accent: '220 30% 66%' },
+  },
+  rose: {
+    light: { primary: '348 70% 48%',  ring: '348 70% 48%',  accent: '355 65% 52%' },
+    dark:  { primary: '348 75% 62%',  ring: '348 75% 62%',  accent: '355 70% 66%' },
+  },
+};
+
+/* Apply / clear the active theme colour vars directly on <html> inline style */
+function applyThemeColor(root: HTMLElement, color: ThemeColor, isDark: boolean) {
+  const palette = COLOR_PALETTES[color] ?? COLOR_PALETTES.dynamic;
+  const vars = isDark ? palette.dark : palette.light;
+
+  const PROPS = ['--primary', '--ring', '--accent', '--sidebar-primary', '--sidebar-ring', '--chart-1'];
+  const propMap: Record<string, string> = {
+    '--primary': vars.primary,
+    '--ring': vars.ring,
+    '--accent': vars.accent,
+    '--sidebar-primary': vars.primary,
+    '--sidebar-ring': vars.ring,
+    '--chart-1': vars.primary,
+  };
+
+  PROPS.forEach(p => root.style.setProperty(p, propMap[p]));
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -70,24 +121,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInitialized(true);
   }, []);
 
-  /* ── Apply theme/appearance classes to <html> ── */
+  /* ── Apply all appearance classes/vars to <html> ── */
   useEffect(() => {
     if (!initialized) return;
     const root = document.documentElement;
-
-    /* Dark / light / system */
     const { theme, themeColor, amoledBlack, systemFont } = settings;
+
+    /* 1. Dark / light / system */
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
     root.classList.toggle('dark', isDark);
 
-    /* Theme color palette */
-    root.setAttribute('data-color', themeColor || 'dynamic');
+    /* 2. Theme colour — inline style wins over any stylesheet rule */
+    applyThemeColor(root, themeColor ?? 'dynamic', isDark);
 
-    /* AMOLED pure black */
+    /* 3. AMOLED pure black */
     root.classList.toggle('amoled', !!amoledBlack);
 
-    /* System font override */
+    /* 4. System font override */
     root.classList.toggle('system-font', !!systemFont);
   }, [settings.theme, settings.themeColor, settings.amoledBlack, settings.systemFont, initialized]);
 
