@@ -122,7 +122,7 @@ export default function Settings() {
       {/* Theme colour */}
       <div className="glass-card rounded-2xl p-4">
         <p className="text-sm font-semibold text-foreground mb-3">Theme Color</p>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
           {THEME_COLORS.map(({ id, label, swatch }) => {
             const active = settings.themeColor === id;
             return (
@@ -130,17 +130,30 @@ export default function Settings() {
                 key={id}
                 onClick={() => updateSettings({ themeColor: id })}
                 data-testid={`btn-color-${id}`}
-                className="flex flex-col items-center gap-1.5 shrink-0"
+                className="flex flex-col items-center gap-2 shrink-0 outline-none focus-visible:outline-none"
               >
+                {/*
+                  Two-layer approach: outer ring wrapper (transparent or visible border)
+                  + inner filled circle. No ring-offset, no scale — avoids all clipping bugs.
+                */}
                 <div className={cn(
-                  'w-12 h-12 rounded-full flex items-center justify-center transition-all',
-                  swatch,
-                  active ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground/30 scale-110' : 'opacity-80 hover:opacity-100 hover:scale-105'
+                  'w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-200',
+                  active
+                    ? 'border-[2.5px] border-foreground/60'
+                    : 'border-[2.5px] border-transparent'
                 )}>
-                  {active && <Check className="w-5 h-5 text-white" strokeWidth={3} />}
+                  <div className={cn(
+                    'w-10 h-10 rounded-full flex items-center justify-center transition-opacity duration-200',
+                    swatch,
+                    !active && 'opacity-75 hover:opacity-100'
+                  )}>
+                    {active && (
+                      <Check className="w-4.5 h-4.5 text-white drop-shadow-sm" strokeWidth={3} />
+                    )}
+                  </div>
                 </div>
                 <span className={cn(
-                  'text-[11px] font-medium transition-colors',
+                  'text-[11px] font-semibold leading-none transition-colors',
                   active ? 'text-foreground' : 'text-muted-foreground'
                 )}>{label}</span>
               </button>
