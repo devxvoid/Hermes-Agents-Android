@@ -1,4 +1,4 @@
-name: Build Hermes Android APK (With Logs)
+name: Build Hermes Android APK
 
 on:
   workflow_dispatch:
@@ -45,13 +45,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --frozen-lockfile | tee install.log
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
 
-      # 🔧 FIX TYPESCRIPT ISSUE
       - name: Auto-fix Hermes TypeScript null errors
         run: |
           python3 <<'PY'
           from pathlib import Path
+
           path = Path("artifacts/hermes/src/pages/Chat.tsx")
           text = path.read_text()
 
@@ -62,19 +62,19 @@ jobs:
           path.write_text(text)
           PY
 
-      # 📊 TYPECHECK LOG
+          grep -n "selectedAgent" artifacts/hermes/src/pages/Chat.tsx || true
+
       - name: Typecheck workspace
         run: |
-          pnpm run typecheck | tee typecheck.log
+          pnpm run typecheck 2>&1 | tee typecheck.log
 
-      # 🌐 WEB BUILD LOG
       - name: Build Hermes web app
         run: |
-          pnpm --filter @workspace/hermes run build | tee web-build.log
+          pnpm --filter @workspace/hermes run build 2>&1 | tee web-build.log
 
       - name: Install Capacitor
         run: |
-          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android | tee capacitor-install.log
+          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android 2>&1 | tee capacitor-install.log
 
       - name: Create Capacitor config
         run: |
@@ -92,50 +92,67 @@ jobs:
 
       - name: Generate Android project
         run: |
-          pnpm exec cap add android | tee cap-add.log
-          pnpm exec cap sync android | tee cap-sync.log
+          pnpm exec cap add android 2>&1 | tee cap-add.log
+          pnpm exec cap sync android 2>&1 | tee cap-sync.log
 
       - name: Make Gradle executable
-        run: chmod +x android/gradlew
+        run: |
+          chmod +x android/gradlew
 
-      # 🔥 FULL ANDROID BUILD LOG
-      - name: Build APK (Verbose)
+      - name: Build APK
         working-directory: android
         run: |
-          ./gradlew assembleDebug \
-            --stacktrace \
-            --info \
-            --debug \
-            | tee gradle-build.log
+          ./gradlew assembleDebug --stacktrace --info 2>&1 | tee ../gradle-build.log
 
-      # 📦 COLLECT APK
       - name: Collect APK
+        if: always()
         run: |
           mkdir -p output
-          cp android/app/build/outputs/apk/debug/app-debug.apk output/Hermes-Agents-debug.apk
 
-      # 📊 COLLECT ALL LOGS
+          echo "Searching for APK files..."
+          find android -type f -name "*.apk" 2>/dev/null | tee apk-files.log || true
+
+          APK_PATH="$(find android -type f -name "*.apk" 2>/dev/null | head -n 1 || true)"
+
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found."
+            echo "Listing Android build output files..."
+            find android -type f 2>/dev/null | grep -E "outputs|apk|bundle|build" | tee android-build-files.log || true
+            exit 1
+          fi
+
+          echo "Found APK: $APK_PATH"
+          cp "$APK_PATH" output/Hermes-Agents-debug.apk
+
       - name: Collect logs
+        if: always()
         run: |
           mkdir -p logs
-          mv *.log logs/ || true
 
-          # Gradle reports if exist
+          cp *.log logs/ 2>/dev/null || true
+
           if [ -d "android/app/build/reports" ]; then
             cp -r android/app/build/reports logs/gradle-reports
           fi
 
-      # 📤 UPLOAD APK
+          find android -type f -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
+
+          echo "Collected logs:"
+          find logs -type f || true
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Hermes-Agents-debug-apk
           path: output/Hermes-Agents-debug.apk
 
-      # 📤 UPLOAD LOGS (ALWAYS)
       - name: Upload Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
-          path: logs
+          name: Hermes-Agents-build-logs
+          path: |
+            logs
+            *.log
+          if-no-files-found: warn
