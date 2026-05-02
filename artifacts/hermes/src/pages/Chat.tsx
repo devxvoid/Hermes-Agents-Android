@@ -139,23 +139,32 @@ function ChatContent() {
     <div className="flex flex-col h-screen" data-testid="chat-page">
 
       {/* ── Top bar ── */}
-      <div className="glass-bar border-t-0 px-4 py-3 flex items-center justify-between shrink-0 z-10">
-        <h1 className="text-sm font-semibold truncate">{activeConv?.title || 'New Chat'}</h1>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={cn('text-xs px-3 py-1 rounded-full border font-medium',
-            activeProvider ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border-amber-500/20')}>
-            {activeProvider ? activeProvider.selectedModel : 'Demo'}
-          </span>
+      <div className="glass-bar border-t-0 border-b border-border/50 px-4 py-2.5 flex items-center justify-between shrink-0 z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-6 h-6 rounded-[8px] bg-gradient-to-br from-primary/80 to-accent/70 flex items-center justify-center shrink-0">
+            <span className="text-white text-[10px] font-black select-none">H</span>
+          </div>
+          <h1 className="text-sm font-semibold truncate text-foreground">{activeConv?.title || 'New Chat'}</h1>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
           {memories.some(m => m.active) && (
-            <span className="w-7 h-7 rounded-full glass-card flex items-center justify-center">
-              <Brain className="w-3.5 h-3.5 text-cyan-400" />
+            <span title="Memory active" className="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+              <Brain className="w-3 h-3 text-cyan-400" />
             </span>
           )}
           {skills.some(s => s.enabled) && (
-            <span className="w-7 h-7 rounded-full glass-card flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-violet-400" />
+            <span title="Skills active" className="w-6 h-6 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+              <Zap className="w-3 h-3 text-violet-400" />
             </span>
           )}
+          <span className={cn(
+            'text-[11px] px-2.5 py-1 rounded-full border font-semibold',
+            activeProvider
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/18'
+              : 'bg-amber-500/10 text-amber-400 border-amber-500/18'
+          )}>
+            {activeProvider ? activeProvider.selectedModel.split('/').pop() : 'Demo'}
+          </span>
         </div>
       </div>
 
