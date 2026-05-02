@@ -1,4 +1,53 @@
-- name: Auto-fix TypeScript and Force Light Theme
+name: Build Hermes Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_VERSION: "24"
+      JAVA_VERSION: "21"
+      PORT: "4173"
+      BASE_PATH: "/"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile 2>&1 | tee install.log
+
+      - name: Auto-fix TypeScript and Force Light Theme
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -13,23 +62,25 @@
 
           for path in Path("artifacts/hermes/src").rglob("*.tsx"):
               text = path.read_text()
-
-              text = text.replace("bg-slate-950", "bg-white dark:bg-slate-950")
-              text = text.replace("bg-slate-900", "bg-slate-50 dark:bg-slate-900")
-              text = text.replace("bg-gray-950", "bg-white dark:bg-gray-950")
-              text = text.replace("bg-gray-900", "bg-gray-50 dark:bg-gray-900")
-              text = text.replace("text-white", "text-slate-950 dark:text-white")
-              text = text.replace("text-slate-100", "text-slate-900 dark:text-slate-100")
-              text = text.replace("text-gray-100", "text-gray-900 dark:text-gray-100")
-              text = text.replace("border-slate-800", "border-slate-200 dark:border-slate-800")
-              text = text.replace("border-gray-800", "border-gray-200 dark:border-gray-800")
-
+              replacements = {
+                  "bg-slate-950": "bg-white dark:bg-slate-950",
+                  "bg-slate-900": "bg-slate-50 dark:bg-slate-900",
+                  "bg-gray-950": "bg-white dark:bg-gray-950",
+                  "bg-gray-900": "bg-gray-50 dark:bg-gray-900",
+                  "text-white": "text-slate-950 dark:text-white",
+                  "text-slate-100": "text-slate-900 dark:text-slate-100",
+                  "text-gray-100": "text-gray-900 dark:text-gray-100",
+                  "border-slate-800": "border-slate-200 dark:border-slate-800",
+                  "border-gray-800": "border-gray-200 dark:border-gray-800"
+              }
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
               path.write_text(text)
 
           css = Path("artifacts/hermes/src/index.css")
           if css.exists():
               text = css.read_text()
-              patch = """
+              patch = r'''
 
           /* Force Light Theme Fix */
           html:not(.dark),
@@ -60,9 +111,84 @@
             background: #ffffff !important;
             color: #0f172a !important;
           }
-          """
+          '''
               if "Force Light Theme Fix" not in text:
                   css.write_text(text + patch)
 
-          print("TypeScript and light theme patch complete")
+          print("Patch complete")
           PY
+
+      - name: Typecheck workspace
+        run: |
+          pnpm run typecheck 2>&1 | tee typecheck.log
+
+      - name: Build Hermes web app
+        run: |
+          pnpm --filter @workspace/hermes run build 2>&1 | tee web-build.log
+
+      - name: Install Capacitor
+        run: |
+          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android 2>&1 | tee capacitor-install.log
+
+      - name: Create Capacitor config
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.mrrobot.hermesagents",
+            "appName": "Hermes Agents",
+            "webDir": "artifacts/hermes/dist/public",
+            "bundledWebRuntime": false
+          }
+          EOF
+
+      - name: Generate Android project
+        run: |
+          pnpm exec cap add android 2>&1 | tee cap-add.log
+          pnpm exec cap sync android 2>&1 | tee cap-sync.log
+
+      - name: Make Gradle executable
+        run: |
+          chmod +x android/gradlew
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug --stacktrace --info 2>&1 | tee ../gradle-build.log
+
+      - name: Collect APK
+        if: always()
+        run: |
+          mkdir -p output
+          find android -type f -name "*.apk" 2>/dev/null | tee apk-files.log || true
+          APK_PATH="$(find android -type f -name "*.apk" 2>/dev/null | head -n 1 || true)"
+
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found."
+            exit 1
+          fi
+
+          cp "$APK_PATH" output/Hermes-Agents-debug.apk
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp *.log logs/ 2>/dev/null || true
+          find android -type f -name "*.log" -exec cp {} logs/ \; 2>/dev/null || true
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-Agents-debug-apk
+          path: output/Hermes-Agents-debug.apk
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-Agents-build-logs
+          path: |
+            logs
+            *.log
+          if-no-files-found: warn
