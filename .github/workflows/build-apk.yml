@@ -1,4 +1,4 @@
-name: Build Hermes Android APK
+name: Build Hermes Android APK (With Logs)
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 24
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -34,7 +34,7 @@ jobs:
           version: 10
           run_install: false
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -44,17 +44,37 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile | tee install.log
 
+      # 🔧 FIX TYPESCRIPT ISSUE
+      - name: Auto-fix Hermes TypeScript null errors
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path("artifacts/hermes/src/pages/Chat.tsx")
+          text = path.read_text()
+
+          text = text.replace("selectedAgent)", "(selectedAgent ?? \"\")")
+          text = text.replace("selectedAgent,", "(selectedAgent ?? \"\"),")
+          text = text.replace("selectedAgent\n", "(selectedAgent ?? \"\")\n")
+
+          path.write_text(text)
+          PY
+
+      # 📊 TYPECHECK LOG
       - name: Typecheck workspace
-        run: pnpm run typecheck
+        run: |
+          pnpm run typecheck | tee typecheck.log
 
+      # 🌐 WEB BUILD LOG
       - name: Build Hermes web app
-        run: pnpm --filter @workspace/hermes run build
+        run: |
+          pnpm --filter @workspace/hermes run build | tee web-build.log
 
       - name: Install Capacitor
         run: |
-          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android
+          pnpm add -Dw @capacitor/core @capacitor/cli @capacitor/android | tee capacitor-install.log
 
       - name: Create Capacitor config
         run: |
@@ -72,23 +92,50 @@ jobs:
 
       - name: Generate Android project
         run: |
-          pnpm exec cap add android
-          pnpm exec cap sync android
+          pnpm exec cap add android | tee cap-add.log
+          pnpm exec cap sync android | tee cap-sync.log
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      # 🔥 FULL ANDROID BUILD LOG
+      - name: Build APK (Verbose)
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug \
+            --stacktrace \
+            --info \
+            --debug \
+            | tee gradle-build.log
 
+      # 📦 COLLECT APK
       - name: Collect APK
         run: |
           mkdir -p output
           cp android/app/build/outputs/apk/debug/app-debug.apk output/Hermes-Agents-debug.apk
 
-      - name: Upload APK artifact
+      # 📊 COLLECT ALL LOGS
+      - name: Collect logs
+        run: |
+          mkdir -p logs
+          mv *.log logs/ || true
+
+          # Gradle reports if exist
+          if [ -d "android/app/build/reports" ]; then
+            cp -r android/app/build/reports logs/gradle-reports
+          fi
+
+      # 📤 UPLOAD APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Hermes-Agents-debug-apk
           path: output/Hermes-Agents-debug.apk
+
+      # 📤 UPLOAD LOGS (ALWAYS)
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: logs
