@@ -3,14 +3,29 @@ import { LayoutDashboard, MessageSquare, MessagesSquare, Brain, Zap, Cpu, Settin
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
 
-const navItems = [
-  { path: '/',              label: 'Dashboard',     icon: LayoutDashboard },
-  { path: '/chat',          label: 'Chat',          icon: MessageSquare   },
-  { path: '/conversations', label: 'Conversations', icon: MessagesSquare  },
-  { path: '/memory',        label: 'Memory',        icon: Brain           },
-  { path: '/skills',        label: 'Skills',        icon: Zap             },
-  { path: '/ai-models',     label: 'AI Models',     icon: Cpu             },
-  { path: '/settings',      label: 'Settings',      icon: Settings        },
+const NAV_SECTIONS = [
+  {
+    label: 'Main',
+    items: [
+      { path: '/',              label: 'Dashboard',     icon: LayoutDashboard },
+      { path: '/chat',          label: 'Chat',          icon: MessageSquare   },
+      { path: '/conversations', label: 'Conversations', icon: MessagesSquare  },
+    ]
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { path: '/memory',    label: 'Memory',    icon: Brain },
+      { path: '/skills',    label: 'Skills',    icon: Zap   },
+      { path: '/ai-models', label: 'AI Models', icon: Cpu   },
+    ]
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/settings', label: 'Settings', icon: Settings },
+    ]
+  },
 ];
 
 export function Sidebar() {
@@ -21,72 +36,97 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="hidden md:flex flex-col w-60 h-screen sticky top-0 shrink-0 glass-sidebar">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-border/20">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
-            <span className="text-primary font-bold text-sm">H</span>
+    <aside className="hidden md:flex flex-col w-[220px] h-screen sticky top-0 shrink-0 glass-sidebar">
+
+      {/* ── Brand ── */}
+      <div className="px-4 py-5">
+        <div className="flex items-center gap-3">
+          <div className="app-icon-sm">
+            <span className="text-white font-black text-base select-none" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>H</span>
           </div>
-          <div className="min-w-0">
-            <div className="font-semibold text-sm text-sidebar-foreground">{settings.agentName}</div>
-            <div className="text-[11px] truncate mt-0.5">
+          <div className="min-w-0 flex-1">
+            <div className="font-extrabold text-[15px] tracking-tight text-sidebar-foreground leading-none">
+              {settings.agentName}
+            </div>
+            <div className="text-[11px] mt-1 truncate font-medium">
               {activeProvider
                 ? <span className="text-emerald-500">{activeProvider.selectedModel}</span>
-                : <span className="text-amber-500">Demo Mode</span>}
+                : <span className="text-amber-500/90">Demo Mode</span>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto no-scrollbar">
-        {navItems.map(({ path, label, icon: Icon }) => {
-          const isActive = path === '/' ? location === '/' : location.startsWith(path);
-          return (
-            <Link
-              key={path}
-              href={path}
-              data-testid={`nav-${label.toLowerCase().replace(' ', '-')}`}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group',
-                isActive
-                  ? 'bg-primary/12 text-primary border border-primary/20'
-                  : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-foreground/[0.06] border border-transparent'
-              )}
-            >
-              <Icon className={cn(
-                'w-4 h-4 shrink-0',
-                isActive ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-sidebar-foreground'
-              )} />
-              <span className="flex-1">{label}</span>
-            </Link>
-          );
-        })}
+      <div className="h-px bg-sidebar-border mx-4" />
+
+      {/* ── Nav sections ── */}
+      <nav className="flex-1 px-2.5 py-3 overflow-y-auto no-scrollbar space-y-4">
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 px-2 mb-1.5">
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map(({ path, label, icon: Icon }) => {
+                const isActive = path === '/' ? location === '/' : location.startsWith(path);
+                return (
+                  <Link
+                    key={path}
+                    href={path}
+                    data-testid={`nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                    className={cn(
+                      'relative flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 group',
+                      isActive
+                        ? 'text-primary bg-primary/10 dark:bg-primary/12'
+                        : 'text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-foreground/[0.06]'
+                    )}
+                  >
+                    {/* Active left indicator bar */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
+                    )}
+                    <Icon className={cn(
+                      'w-[15px] h-[15px] shrink-0 transition-colors',
+                      isActive ? 'text-primary' : 'text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70'
+                    )} />
+                    <span className="flex-1">{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Status footer */}
-      <div className="px-3 py-4 border-t border-border/20">
-        <div className="px-3 py-2.5 rounded-xl glass-card">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              'w-1.5 h-1.5 rounded-full shrink-0',
-              activeProvider
-                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.9)]'
-                : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,.8)]'
-            )} />
-            <span className={cn(
-              'text-xs font-medium',
+      <div className="h-px bg-sidebar-border mx-4" />
+
+      {/* ── Status footer ── */}
+      <div className="px-3 py-3.5">
+        <div className={cn(
+          'flex items-center gap-2 px-3 py-2.5 rounded-xl',
+          'bg-sidebar-foreground/[0.04] border border-sidebar-border'
+        )}>
+          <span className={cn(
+            'w-2 h-2 rounded-full shrink-0 ring-4',
+            activeProvider
+              ? 'bg-emerald-400 ring-emerald-400/20 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+              : 'bg-amber-400 ring-amber-400/20 shadow-[0_0_8px_rgba(251,191,36,0.7)]'
+          )} />
+          <div className="min-w-0 flex-1">
+            <p className={cn('text-[12px] font-semibold leading-none',
               activeProvider ? 'text-emerald-500' : 'text-amber-500'
             )}>
-              {activeProvider ? activeProvider.name : 'Demo Mode'}
-            </span>
-          </div>
-          {!activeProvider && (
-            <p className="text-[10px] text-muted-foreground/60 mt-1 leading-snug">
-              Configure a model to enable real AI
+              {activeProvider ? 'Connected' : 'Demo Mode'}
             </p>
-          )}
+            {!activeProvider && (
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5 leading-snug">
+                Configure a model to start
+              </p>
+            )}
+            {activeProvider && (
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5 truncate">{activeProvider.name}</p>
+            )}
+          </div>
         </div>
       </div>
     </aside>
