@@ -34,13 +34,15 @@ export default function MemoryPage() {
   const handleOpenNew = () => { setEditItem(null); setFormOpen(true); };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4 pb-24 md:pb-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Memory</h1>
-          <p className="text-sm text-muted-foreground">{memories.filter(m => m.active).length} active memories</p>
+          <p className="text-sm text-muted-foreground">
+            {memories.filter(m => m.active).length} active · {memories.length} total
+          </p>
         </div>
-        <Button onClick={handleOpenNew} size="sm" data-testid="btn-add-memory">
+        <Button onClick={handleOpenNew} size="sm" className="glow-primary" data-testid="btn-add-memory">
           <Plus className="w-4 h-4 mr-1.5" />Add Memory
         </Button>
       </div>
@@ -48,11 +50,19 @@ export default function MemoryPage() {
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search memories..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" data-testid="input-search-memory" />
+          <Input
+            placeholder="Search memories..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 glass-input border-white/10"
+            data-testid="input-search-memory"
+          />
         </div>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-44" data-testid="select-memory-filter"><SelectValue /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="w-40 glass-input border-white/10" data-testid="select-memory-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="glass border-white/10">
             {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>

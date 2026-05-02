@@ -14,7 +14,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Coding': 'bg-green-500/15 text-green-400 border-green-500/20',
   'Workflow': 'bg-amber-500/15 text-amber-400 border-amber-500/20',
   'Contact': 'bg-pink-500/15 text-pink-400 border-pink-500/20',
-  'General': 'bg-gray-500/15 text-gray-400 border-gray-500/20',
+  'General': 'bg-slate-500/15 text-slate-400 border-slate-500/20',
 };
 
 interface MemoryCardProps {
@@ -30,28 +30,25 @@ export function MemoryCard({ memory, onToggle, onEdit, onDelete }: MemoryCardPro
   return (
     <div
       data-testid={`memory-card-${memory.id}`}
-      className={cn(
-        'bg-card border border-card-border rounded-xl p-4 transition-all',
-        !memory.active && 'opacity-50'
-      )}
+      className={cn('glass-card rounded-2xl p-4 transition-all', !memory.active && 'opacity-50')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium', colorClass)}>
               {memory.category}
             </span>
             {memory.tags.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs py-0 px-1.5">{tag}</Badge>
+              <Badge key={tag} variant="outline" className="text-xs py-0 px-1.5 glass border-white/10">{tag}</Badge>
             ))}
           </div>
-          <h3 className="font-medium text-sm text-foreground truncate">{memory.title}</h3>
+          <h3 className="font-semibold text-sm text-foreground">{memory.title}</h3>
           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{memory.content}</p>
-          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground/70">
             {memory.lastUsedAt && (
               <span>Used {formatDistanceToNow(new Date(memory.lastUsedAt), { addSuffix: true })}</span>
             )}
-            {memory.usageCount > 0 && <span>{memory.usageCount}x used</span>}
+            {memory.usageCount > 0 && <span>{memory.usageCount}× used</span>}
             <span>Added {formatDistanceToNow(new Date(memory.createdAt), { addSuffix: true })}</span>
           </div>
         </div>
@@ -64,15 +61,15 @@ export function MemoryCard({ memory, onToggle, onEdit, onDelete }: MemoryCardPro
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-7 w-7" data-testid={`btn-memory-menu-${memory.id}`}>
+              <Button size="icon" variant="ghost" className="h-7 w-7 glass rounded-lg">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(memory)} data-testid={`btn-edit-memory-${memory.id}`}>
+            <DropdownMenuContent align="end" className="glass border-white/10">
+              <DropdownMenuItem onClick={() => onEdit(memory)}>
                 <Edit className="w-4 h-4 mr-2" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(memory.id)} className="text-destructive" data-testid={`btn-delete-memory-${memory.id}`}>
+              <DropdownMenuItem onClick={() => onDelete(memory.id)} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>

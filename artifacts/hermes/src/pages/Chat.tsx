@@ -8,8 +8,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
 import { sendAIMessage } from '@/lib/ai/aiClient';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Cpu, Brain, Zap } from 'lucide-react';
+import { MessageSquare, Brain, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,7 +25,7 @@ function ConversationNotFound({ id }: { id: string }) {
   const [, setLocation] = useLocation();
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+      <div className="w-14 h-14 rounded-2xl glass flex items-center justify-center">
         <MessageSquare className="w-6 h-6 text-muted-foreground" />
       </div>
       <div>
@@ -36,19 +35,8 @@ function ConversationNotFound({ id }: { id: string }) {
         </p>
       </div>
       <div className="flex gap-2 flex-wrap justify-center">
-        <Button onClick={() => setLocation('/conversations')} variant="outline" size="sm" data-testid="btn-go-to-chats">Go to Chats</Button>
-        <Button onClick={() => setLocation('/chat')} size="sm" data-testid="btn-start-new-chat">Start New Chat</Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => {
-            localStorage.removeItem(`hermes_conv_${id}`);
-            setLocation('/chat');
-          }}
-          data-testid="btn-clear-broken"
-        >
-          Clear Broken Reference
-        </Button>
+        <Button onClick={() => setLocation('/conversations')} variant="outline" size="sm">Go to Chats</Button>
+        <Button onClick={() => setLocation('/chat')} size="sm">Start New Chat</Button>
       </div>
     </div>
   );
@@ -104,10 +92,7 @@ function ChatContent() {
     addConversation(conv);
     setActiveConvId(id);
     setActiveConversationId(id);
-    const targetPath = `/chat/${id}`;
-    if (location.pathname !== targetPath) {
-      setLocation(targetPath);
-    }
+    setLocation(`/chat/${id}`);
   }, [addConversation, setActiveConversationId, setLocation]);
 
   const handleSend = useCallback(async (text: string) => {
@@ -131,10 +116,7 @@ function ChatContent() {
       setActiveConversationId(id);
       convId = id;
       conv = newConv;
-      const targetPath = `/chat/${id}`;
-      if (location.pathname !== targetPath) {
-        setLocation(targetPath);
-      }
+      setLocation(`/chat/${id}`);
     }
 
     const userMsg: Message = {
@@ -240,7 +222,7 @@ function ChatContent() {
   }, [activeConvId, conversations, memories, skills, settings, providers, addConversation, updateConversation, setActiveConversationId, setLocation, scrollToBottom, toast]);
 
   function buildSystemPrompt(usedMems: typeof memories, triggeredSkills: typeof skills): string {
-    let prompt = `You are Hermes AI Agent, a professional autonomous assistant. Use relevant memories and enabled skills only when they genuinely improve the answer. Do not force memory or skills into casual messages. Be clear, practical, and concise unless the user requests detail.`;
+    let prompt = `You are Hermes AI Agent, a professional autonomous assistant. Use relevant memories and enabled skills only when they genuinely improve the answer. Be clear, practical, and concise unless the user requests detail.`;
     if (settings.responseStyle === 'concise') prompt += ' Keep responses concise and to the point.';
     if (settings.responseStyle === 'detailed') prompt += ' Provide detailed and thorough responses.';
     if (usedMems.length > 0) {
@@ -260,13 +242,14 @@ function ChatContent() {
   const messages = activeConv?.messages || [];
 
   return (
-    <div className="flex flex-col h-screen md:h-[calc(100vh)]" style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))' }} data-testid="chat-page">
-      <div className="border-b border-border px-4 py-3 flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-md">
-        <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-sm font-semibold text-foreground truncate">
-            {activeConv?.title || 'New Chat'}
-          </h1>
-        </div>
+    /* Full-height flex column — fills the space between the sidebar header and bottom */
+    <div className="flex flex-col h-screen" data-testid="chat-page">
+
+      {/* ── Top bar ── */}
+      <div className="glass-nav border-t-0 border-b border-white/[0.07] px-4 py-3 flex items-center justify-between shrink-0 z-10">
+        <h1 className="text-sm font-semibold text-foreground truncate">
+          {activeConv?.title || 'New Chat'}
+        </h1>
         <div className="flex items-center gap-2 shrink-0">
           <span className={cn(
             'text-xs px-2 py-0.5 rounded-full border font-medium',
@@ -274,44 +257,48 @@ function ChatContent() {
               ? 'bg-green-500/15 text-green-400 border-green-500/20'
               : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
           )}>
-            {activeProvider ? activeProvider.selectedModel : 'Demo Mode'}
+            {activeProvider ? activeProvider.selectedModel : 'Demo'}
           </span>
           {memories.some(m => m.active) && (
-            <span className="text-xs px-1.5 py-0.5 rounded border bg-cyan-500/10 text-cyan-400 border-cyan-500/20 flex items-center gap-1">
+            <span className="text-xs px-1.5 py-0.5 rounded border glass text-cyan-400 border-cyan-500/20 flex items-center gap-1">
               <Brain className="w-3 h-3" />
             </span>
           )}
           {skills.some(s => s.enabled) && (
-            <span className="text-xs px-1.5 py-0.5 rounded border bg-violet-500/10 text-violet-400 border-violet-500/20 flex items-center gap-1">
+            <span className="text-xs px-1.5 py-0.5 rounded border glass text-violet-400 border-violet-500/20 flex items-center gap-1">
               <Zap className="w-3 h-3" />
             </span>
           )}
         </div>
       </div>
 
+      {/* ── Messages scroll area ── */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-4
+          pb-[calc(80px+env(safe-area-inset-bottom))]
+          md:pb-[72px]"
         data-testid="chat-messages"
       >
         {messages.length === 0 && !isTyping && (
-          <div className="flex flex-col items-center justify-center h-full gap-6 py-8">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8">
+            <div className="w-16 h-16 rounded-2xl glass-strong glass-shine flex items-center justify-center">
               <span className="text-primary font-bold text-2xl">H</span>
             </div>
-            <div className="text-center">
+            <div className="text-center px-4">
               <h2 className="text-lg font-semibold text-foreground">How can I help you today?</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {activeProvider ? `Connected to ${activeProvider.name}` : 'Running in Demo Mode — configure an AI model for real responses'}
+                {activeProvider
+                  ? `Connected to ${activeProvider.name}`
+                  : 'Demo Mode — configure an AI model for real responses'}
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl px-2">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => handleSend(prompt)}
-                  data-testid={`starter-prompt-${prompt.slice(0, 20)}`}
-                  className="text-left text-sm bg-card border border-card-border rounded-xl px-4 py-3 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all"
+                  className="text-left text-sm glass-card rounded-xl px-4 py-3 text-muted-foreground hover:text-foreground transition-all"
                 >
                   {prompt}
                 </button>
@@ -327,7 +314,11 @@ function ChatContent() {
         {isTyping && <TypingIndicator />}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 md:left-60" style={{ zIndex: 40 }}>
+      {/* ── Chat input — sits above mobile nav, flush with sidebar on desktop ── */}
+      <div className="
+        fixed bottom-[64px] left-0 right-0 z-40
+        md:bottom-0 md:left-60
+      ">
         <ChatInput
           onSend={handleSend}
           onNewChat={createNewConversation}

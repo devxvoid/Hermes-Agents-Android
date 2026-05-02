@@ -23,44 +23,60 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-sidebar/95 backdrop-blur-md border-t border-sidebar-border" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex items-center justify-around px-1 py-1">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-nav"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-center justify-around px-1 py-1.5">
           {primaryNav.map(({ path, label, icon: Icon }) => {
             const isActive = path === '/' ? location === '/' : location.startsWith(path);
             return (
-              <Link key={path} href={path}
+              <Link
+                key={path}
+                href={path}
                 data-testid={`mobile-nav-${label.toLowerCase()}`}
                 className={cn(
-                  'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[44px] transition-all',
+                  'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[48px] transition-all',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
-                <Icon className={cn('w-5 h-5', isActive && 'text-primary')} />
-                <span className={cn('text-[10px] font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>{label}</span>
+                <div className={cn(
+                  'p-1 rounded-lg transition-all',
+                  isActive && 'glass glow-primary'
+                )}>
+                  <Icon className={cn('w-5 h-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                </div>
+                <span className={cn('text-[10px] font-medium leading-none', isActive ? 'text-primary' : 'text-muted-foreground/70')}>
+                  {label}
+                </span>
               </Link>
             );
           })}
           <button
             onClick={() => setMoreOpen(true)}
             data-testid="mobile-nav-more"
-            className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[44px] text-muted-foreground transition-all"
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[48px] text-muted-foreground transition-all"
           >
-            <MoreHorizontal className="w-5 h-5" />
-            <span className="text-[10px] font-medium">More</span>
+            <div className="p-1 rounded-lg">
+              <MoreHorizontal className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-medium leading-none text-muted-foreground/70">More</span>
           </button>
         </div>
       </nav>
 
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
+        <SheetContent side="bottom" className="rounded-t-2xl glass-strong border-white/10">
           <SheetHeader className="pb-4">
             <SheetTitle>More</SheetTitle>
           </SheetHeader>
           <div className="space-y-1 pb-6">
             {moreNav.map(({ path, label, icon: Icon }) => (
-              <Link key={path} href={path}
+              <Link
+                key={path}
+                href={path}
                 onClick={() => setMoreOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.06] transition-colors"
               >
                 <Icon className="w-5 h-5 text-muted-foreground" />
                 <span className="font-medium">{label}</span>
