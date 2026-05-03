@@ -5,9 +5,11 @@ import { MessageBubble, TypingIndicator } from '@/components/chat/MessageBubble'
 import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
 import { ToolsSheet } from '@/components/ui/ToolsSheet';
 import { ModelPickerSheet } from '@/components/ui/ModelPickerSheet';
+import { VoiceInputBar } from '@/components/ui/VoiceInputBar';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
 import { sendAIMessage } from '@/lib/ai/aiClient';
 import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mic, BarChart2, Plus, SlidersHorizontal,
   Sparkles, Send, Paperclip, X,
@@ -47,6 +49,7 @@ export default function Dashboard() {
   const [attachOpen,   setAttachOpen]   = useState(false);
   const [toolsOpen,    setToolsOpen]    = useState(false);
   const [modelOpen,    setModelOpen]    = useState(false);
+  const [voiceActive,  setVoiceActive]  = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef   = useRef<HTMLDivElement>(null);
@@ -349,43 +352,70 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Toolbar row */}
-        <div className="flex items-center justify-between px-1">
-          {/* Left: attach + tools */}
-          <div className="flex items-center gap-5">
-            <button
-              className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
-              onClick={e => { e.stopPropagation(); setAttachOpen(v => !v); }}
+        {/* Toolbar row — voice mode swaps entire row */}
+        <AnimatePresence mode="wait" initial={false}>
+          {voiceActive ? (
+            <VoiceInputBar
+              key="voice"
+              onAttach={() => { setVoiceActive(false); setAttachOpen(true); }}
+              onStop={text => {
+                setVoiceActive(false);
+                if (text) { setInputValue(text); setTimeout(() => textareaRef.current?.focus(), 80); }
+              }}
+              onSend={text => {
+                setVoiceActive(false);
+                if (text) handleSend(text);
+              }}
+            />
+          ) : (
+            <motion.div
+              key="toolbar"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center justify-between px-1"
             >
-              <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
-            </button>
-            <button
-              className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
-              onClick={e => { e.stopPropagation(); setToolsOpen(true); }}
-            >
-              <SlidersHorizontal className="w-[20px] h-[20px]" strokeWidth={1.8} />
-            </button>
-          </div>
+              {/* Left: attach + tools */}
+              <div className="flex items-center gap-5">
+                <button
+                  className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
+                  onClick={e => { e.stopPropagation(); setAttachOpen(v => !v); }}
+                >
+                  <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+                <button
+                  className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
+                  onClick={e => { e.stopPropagation(); setToolsOpen(true); }}
+                >
+                  <SlidersHorizontal className="w-[20px] h-[20px]" strokeWidth={1.8} />
+                </button>
+              </div>
 
-          {/* Right: model badge + mic + analyze */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={e => { e.stopPropagation(); setModelOpen(true); }}
-              className="gemini-speed-badge flex items-center gap-1.5 px-3.5 py-1.5 rounded-full active:scale-95 transition-transform"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-foreground/60" />
-              <span className="text-[13px] font-medium text-foreground/70">
-                {activeProvider ? (activeProvider.selectedModel.split('/').pop()?.slice(0, 12) ?? 'AI') : 'Demo'}
-              </span>
-            </button>
-            <button className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90">
-              <Mic className="w-[22px] h-[22px]" strokeWidth={1.8} />
-            </button>
-            <button className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90">
-              <BarChart2 className="w-[22px] h-[22px]" strokeWidth={1.8} />
-            </button>
-          </div>
-        </div>
+              {/* Right: model badge + mic + analyze */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={e => { e.stopPropagation(); setModelOpen(true); }}
+                  className="gemini-speed-badge flex items-center gap-1.5 px-3.5 py-1.5 rounded-full active:scale-95 transition-transform"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-foreground/60" />
+                  <span className="text-[13px] font-medium text-foreground/70">
+                    {activeProvider ? (activeProvider.selectedModel.split('/').pop()?.slice(0, 12) ?? 'AI') : 'Demo'}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setVoiceActive(true)}
+                  className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90"
+                >
+                  <Mic className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+                <button className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90">
+                  <BarChart2 className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Attachment menu */}
