@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, MessageSquare, MessagesSquare, Brain, Zap, Cpu, Settings } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, MessagesSquare, Brain, Zap, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
 
@@ -15,15 +15,14 @@ const NAV_SECTIONS = [
   {
     label: 'Intelligence',
     items: [
-      { path: '/memory',    label: 'Memory',    icon: Brain },
-      { path: '/skills',    label: 'Skills',    icon: Zap   },
-      { path: '/ai-models', label: 'AI Models', icon: Cpu   },
+      { path: '/memory', label: 'Memory', icon: Brain },
+      { path: '/skills', label: 'Skills', icon: Zap   },
     ]
   },
   {
     label: 'System',
     items: [
-      { path: '/settings', label: 'Settings', icon: Settings },
+      { path: '/settings',   label: 'Settings',   icon: Settings },
     ]
   },
 ];
@@ -42,7 +41,7 @@ export function Sidebar() {
       <div className="px-4 py-5">
         <div className="flex items-center gap-3">
           <div className="app-icon-sm">
-            <span className="text-white font-black text-base select-none" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>H</span>
+            <span className="text-white font-black text-base select-none" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>R</span>
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-extrabold text-[15px] tracking-tight text-sidebar-foreground leading-none">
@@ -81,7 +80,6 @@ export function Sidebar() {
                         : 'text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-foreground/[0.06]'
                     )}
                   >
-                    {/* Active left indicator bar */}
                     {isActive && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
                     )}
