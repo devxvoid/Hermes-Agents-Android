@@ -110,7 +110,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
    ADD KEY SHEET (bottom panel)
 ═══════════════════════════════════════════════════════════ */
 function AddKeyPanel({ onClose }: { onClose: () => void }) {
-  const { addProvider, updateProvider, providers } = useApp();
+  const { addProvider, updateProvider, providers, updateSettings, settings } = useApp();
   const { toast } = useToast();
   const [provider, setProvider] = useState(ONLINE_PROVIDERS[0].name);
   const [apiKey, setApiKey] = useState('');
@@ -162,7 +162,10 @@ function AddKeyPanel({ onClose }: { onClose: () => void }) {
     const finalCfg = { ...cfg, status: result.success ? 'connected' as const : 'error' as const };
     if (existing) updateProvider(existing.id, finalCfg);
     else updateProvider(cfg.id, finalCfg);
-    toast({ title: result.success ? `${provider} connected!` : 'Connection failed', description: result.message, variant: result.success ? 'default' : 'destructive' });
+    if (result.success) {
+      updateSettings({ activeProviderId: finalCfg.id });
+    }
+    toast({ title: result.success ? `${provider} connected & activated!` : 'Connection failed', description: result.message, variant: result.success ? 'default' : 'destructive' });
     setIsTesting(false);
     if (result.success) onClose();
   };

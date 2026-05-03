@@ -44,15 +44,13 @@ export async function sendGeminiMessage(messages: {role: string; content: string
       maxOutputTokens: options.maxTokens ?? 2048,
     },
   };
-  if (systemPrompt) {
-    body.systemInstruction = { parts: [{ text: systemPrompt }] };
-  }
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
 
   if (!response.ok) {
@@ -63,4 +61,69 @@ export async function sendGeminiMessage(messages: {role: string; content: string
 
   const data = await response.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+export async function sendGeminiMessageStream(
+  messages: {role: string; content: string}[],
+  systemPrompt: string,
+  config: AIProviderConfig,
+  options: {temperature?: number; maxTokens?: number} = {},
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  const model = config.selectedModel || 'gemini-1.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+
+  const contents = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+  const body: any = {
+    contents,
+    generationConfig: {
+      temperature: options.temperature ?? 0.7,
+      maxOutputTokens: options.maxTokens ?? 2048,
+    },
+  };
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120000),
+  });
+
+  if (!response.ok) {
+    if (response.status === 400) throw new Error('Invalid Gemini API key or request.');
+    if (response.status === 429) throw new Error('Gemini rate limit reached.');
+    throw new Error(`Gemini error (${response.status})`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      try {
+        const parsed = JSON.parse(data);
+        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) { fullText += text; onChunk(text); }
+      } catch {}
+    }
+  }
+
+  return fullText;
 }

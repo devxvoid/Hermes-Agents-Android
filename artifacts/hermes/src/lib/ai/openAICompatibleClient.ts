@@ -39,18 +39,14 @@ export async function sendOpenAICompatibleMessage(messages: {role: string; conte
     stream: false,
   };
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (config.apiKey) {
-    headers['Authorization'] = `Bearer ${config.apiKey}`;
-  }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
 
   if (!response.ok) {
@@ -63,6 +59,69 @@ export async function sendOpenAICompatibleMessage(messages: {role: string; conte
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
+}
+
+export async function sendOpenAICompatibleMessageStream(
+  messages: {role: string; content: string}[],
+  systemPrompt: string,
+  config: AIProviderConfig,
+  options: {temperature?: number; maxTokens?: number} = {},
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  const baseUrl = config.baseUrl.replace(/\/$/, '');
+  const body: any = {
+    model: config.selectedModel,
+    messages: systemPrompt
+      ? [{ role: 'system', content: systemPrompt }, ...messages]
+      : messages,
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 2048,
+    stream: true,
+  };
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120000),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    if (response.status === 401) throw new Error('Invalid API key. Please check your credentials in AI Models.');
+    if (response.status === 429) throw new Error('Rate limit reached. Please wait and try again.');
+    if (response.status === 404) throw new Error(`Model "${config.selectedModel}" not found.`);
+    throw new Error(`Provider error (${response.status}): ${errorText.slice(0, 200)}`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) { fullText += content; onChunk(content); }
+      } catch {}
+    }
+  }
+
+  return fullText;
 }
 
 export async function fetchOpenAIModels(config: AIProviderConfig): Promise<string[]> {
