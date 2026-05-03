@@ -15,6 +15,7 @@ export interface AppSettings {
   streamingEnabled: boolean;
   activeProviderId?: string;
   activeModelId?: string;
+  profileImage?: string;
 }
 export interface AIProviderConfig { id: string; name: string; type: "openai-compatible"|"anthropic"|"gemini"|"custom-rest"|"local-openai-compatible"; mode: "online"|"local"; apiKey?: string; baseUrl: string; selectedModel: string; customModels: string[]; enabled: boolean; supportsStreaming: boolean; supportsSystemPrompt: boolean; status: "not_configured"|"connected"|"error"|"testing"; lastTestedAt?: string; createdAt: string; updatedAt: string; }
 export interface AIRequestMetadata { providerId: string; providerName: string; model: string; mode: "online"|"local"|"demo"; latencyMs?: number; usedMemoryIds: string[]; triggeredSkillIds: string[]; streaming: boolean; error?: string; }

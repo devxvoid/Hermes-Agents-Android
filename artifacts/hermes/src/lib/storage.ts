@@ -99,7 +99,8 @@ export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
     systemFont: raw.systemFont !== undefined ? Boolean(raw.systemFont) : false,
     streamingEnabled: raw.streamingEnabled !== undefined ? Boolean(raw.streamingEnabled) : true,
     activeProviderId: raw.activeProviderId,
-    activeModelId: raw.activeModelId
+    activeModelId: raw.activeModelId,
+    profileImage: raw.profileImage,
   };
 }
 
