@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Plus, Square, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -7,116 +7,122 @@ interface VoiceInputBarProps {
   onStop: (transcript: string) => void;
   onSend: (transcript: string) => void;
   onAttach: () => void;
+  onTranscriptChange: (text: string) => void;
 }
 
-export function VoiceInputBar({ onStop, onSend, onAttach }: VoiceInputBarProps) {
-  const canvasRef      = useRef<HTMLCanvasElement>(null);
-  const wrapperRef     = useRef<HTMLDivElement>(null);
-  const animFrameRef   = useRef<number>(0);
-  const analyserRef    = useRef<AnalyserNode | null>(null);
-  const streamRef      = useRef<MediaStream | null>(null);
-  const audioCtxRef    = useRef<AudioContext | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const isActiveRef    = useRef(true);          // stays true while component is mounted
-  const finalRef       = useRef('');            // accumulates confirmed text
+export function VoiceInputBar({ onStop, onSend, onAttach, onTranscriptChange }: VoiceInputBarProps) {
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const wrapperRef   = useRef<HTMLDivElement>(null);
+  const rafRef       = useRef<number>(0);        // always holds the LATEST scheduled frame id
+  const analyserRef  = useRef<AnalyserNode | null>(null);
+  const streamRef    = useRef<MediaStream | null>(null);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const recRef       = useRef<any>(null);
+  const activeRef    = useRef(true);             // flip to false on unmount / stop / send
+  const finalRef     = useRef('');               // committed (final) words
+  const interimRef   = useRef('');               // live partial words
 
-  const [transcript, setTranscript] = useState('');
-  const [permError,  setPermError]  = useState(false);
-  const [ready,      setReady]      = useState(false);
+  const [permError, setPermError] = useState(false);
+  const [micReady,  setMicReady]  = useState(false);
 
-  /* ── 1. Start mic + analyser ─────────────────────────────────── */
+  /* ─── helpers ─────────────────────────────────────────────── */
+  function currentText() {
+    const t = (finalRef.current + ' ' + interimRef.current).trim();
+    return t;
+  }
+
+  function stopAll() {
+    activeRef.current = false;
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    audioCtxRef.current?.close().catch(() => {});
+    try { recRef.current?.stop(); } catch {}
+  }
+
+  /* ─── 1. Microphone + analyser ────────────────────────────── */
   useEffect(() => {
-    async function startAudio() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (!isActiveRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then(stream => {
+        if (!activeRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
 
-        streamRef.current   = stream;
-        const actx          = new AudioContext();
+        const actx = new AudioContext();
         audioCtxRef.current = actx;
 
-        const source  = actx.createMediaStreamSource(stream);
         const analyser = actx.createAnalyser();
-        analyser.fftSize             = 128;   // 64 frequency bins
-        analyser.smoothingTimeConstant = 0.75;
-        source.connect(analyser);
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.72;
+        actx.createMediaStreamSource(stream).connect(analyser);
         analyserRef.current = analyser;
-        setReady(true);
-      } catch {
-        setPermError(true);
-      }
-    }
-    startAudio();
 
-    return () => {
-      isActiveRef.current = false;
-      cancelAnimationFrame(animFrameRef.current);
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      audioCtxRef.current?.close();
-    };
+        setMicReady(true);
+      })
+      .catch(() => setPermError(true));
+
+    return () => stopAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── 2. Canvas animation — starts when analyser is ready ────── */
+  /* ─── 2. Waveform draw loop — starts once mic is ready ─────── */
   useEffect(() => {
-    if (!ready) return;
+    if (!micReady) return;
 
     const canvas   = canvasRef.current;
     const wrapper  = wrapperRef.current;
     const analyser = analyserRef.current;
     if (!canvas || !wrapper || !analyser) return;
 
-    const bufLen  = analyser.frequencyBinCount; // 64
-    const data    = new Uint8Array(bufLen);
+    const bufLen = analyser.frequencyBinCount; // 64
+    const data   = new Uint8Array(bufLen);
+    const dpr    = window.devicePixelRatio || 1;
 
     function syncSize() {
-      const dpr  = window.devicePixelRatio || 1;
-      const w    = wrapper!.clientWidth;
-      const h    = wrapper!.clientHeight;
-      if (canvas!.width  !== Math.round(w * dpr) ||
-          canvas!.height !== Math.round(h * dpr)) {
-        canvas!.width  = Math.round(w * dpr);
-        canvas!.height = Math.round(h * dpr);
-        canvas!.style.width  = `${w}px`;
-        canvas!.style.height = `${h}px`;
+      const w = wrapper!.clientWidth;
+      const h = wrapper!.clientHeight;
+      const tw = Math.round(w * dpr);
+      const th = Math.round(h * dpr);
+      if (canvas!.width !== tw || canvas!.height !== th) {
+        canvas!.width  = tw;
+        canvas!.height = th;
+        canvas!.style.width  = w + 'px';
+        canvas!.style.height = h + 'px';
       }
     }
 
-    let frame = 0;
     function draw() {
-      frame = requestAnimationFrame(draw);
-      syncSize();
+      // KEY FIX: update rafRef INSIDE draw() every frame so cleanup always cancels the live frame
+      rafRef.current = requestAnimationFrame(draw);
 
+      syncSize();
       const W = canvas!.width;
       const H = canvas!.height;
       if (W === 0 || H === 0) return;
 
       analyser!.getByteFrequencyData(data);
 
-      const ctx      = canvas!.getContext('2d')!;
+      const ctx    = canvas!.getContext('2d')!;
       ctx.clearRect(0, 0, W, H);
 
-      const BAR_W    = Math.ceil(W / 52);     // ~3px bars at 1x, scales with dpr
-      const GAP      = Math.ceil(W / 60);
-      const STEP     = BAR_W + GAP;
-      const COUNT    = Math.floor(W / STEP);
-      const MIN_H    = Math.ceil(H * 0.08);
-      const MAX_H    = H - 2;
-      const t        = performance.now() / 500;
+      const BAR_W  = Math.max(2, Math.round(W / 55));
+      const GAP    = Math.max(2, Math.round(W / 65));
+      const STEP   = BAR_W + GAP;
+      const COUNT  = Math.floor(W / STEP);
+      const MIN_H  = Math.max(3, Math.round(H * 0.09));
+      const MAX_H  = H - 2;
+      const t      = performance.now() / 480;
 
       for (let i = 0; i < COUNT; i++) {
-        // spread across lower 70% of spectrum for voice range
-        const idx   = Math.floor((i / COUNT) * bufLen * 0.70);
+        const idx   = Math.floor((i / COUNT) * bufLen * 0.72);
         const raw   = data[idx] / 255;
-        // gentle idle shimmer so bars are always visible
-        const idle  = 0.08 + 0.06 * Math.abs(Math.sin(t + i * 0.55));
-        const value = Math.max(raw, idle);
-        const barH  = MIN_H + value * (MAX_H - MIN_H);
+        const idle  = 0.07 + 0.055 * Math.abs(Math.sin(t + i * 0.52));
+        const v     = Math.max(raw, idle);
+        const barH  = Math.round(MIN_H + v * (MAX_H - MIN_H));
         const x     = i * STEP;
         const y     = (H - barH) / 2;
         const r     = Math.min(BAR_W / 2, barH / 2, 3);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.82)';
-        // rounded rect via arc (no roundRect needed for compatibility)
+        // cross-browser rounded rect via arc (no roundRect needed)
+        ctx.fillStyle = 'rgba(255,255,255,0.83)';
         ctx.beginPath();
         ctx.moveTo(x + r, y);
         ctx.lineTo(x + BAR_W - r, y);
@@ -132,117 +138,95 @@ export function VoiceInputBar({ onStop, onSend, onAttach }: VoiceInputBarProps) 
       }
     }
 
-    draw();
-    animFrameRef.current = frame;
-    return () => cancelAnimationFrame(frame);
-  }, [ready]);
+    draw(); // starts the loop (rafRef is updated on the first tick)
 
-  /* ── 3. Speech recognition — auto-restarts on silence ───────── */
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [micReady]);
+
+  /* ─── 3. Speech recognition — auto-restarts on silence ─────── */
   useEffect(() => {
     const SR = (window as any).SpeechRecognition
             || (window as any).webkitSpeechRecognition;
     if (!SR) return;
 
-    let r: any;
-
-    function startRecognition() {
-      if (!isActiveRef.current) return;
-      r = new SR();
-      r.continuous     = true;
-      r.interimResults = true;
+    function start() {
+      if (!activeRef.current) return;
+      const r = new SR();
+      r.continuous      = true;
+      r.interimResults  = true;
       r.maxAlternatives = 1;
-      r.lang           = 'en-US';
+      r.lang            = 'en-US';
 
       r.onresult = (e: any) => {
-        let interimText = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = e.results[i][0].transcript;
+          const seg = e.results[i][0].transcript;
           if (e.results[i].isFinal) {
-            finalRef.current += (finalRef.current ? ' ' : '') + t.trim();
+            finalRef.current   += (finalRef.current ? ' ' : '') + seg.trim();
+            interimRef.current  = '';
           } else {
-            interimText += t;
+            interimRef.current  = seg;
           }
         }
-        setTranscript(finalRef.current + (interimText ? ' ' + interimText : ''));
+        // Live-update the input textarea
+        onTranscriptChange(currentText());
       };
 
       r.onerror = (e: any) => {
-        // "no-speech" is common and harmless — just restart
-        if (e.error !== 'no-speech' && e.error !== 'aborted') {
-          console.warn('SpeechRecognition error:', e.error);
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          setPermError(true);
         }
+        // no-speech / aborted are expected during pauses — ignore
       };
 
-      // Auto-restart: browser stops after silence
-      r.onend = () => {
-        if (isActiveRef.current) startRecognition();
-      };
+      // Auto-restart so silence gaps don't kill transcription
+      r.onend = () => { if (activeRef.current) start(); };
 
       try { r.start(); } catch {}
-      recognitionRef.current = r;
+      recRef.current = r;
     }
 
-    startRecognition();
+    start();
 
     return () => {
-      isActiveRef.current = false;
-      try { recognitionRef.current?.stop(); } catch {}
+      activeRef.current = false;
+      try { recRef.current?.abort(); } catch {}
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Commit helpers ────────────────────────────────────────────── */
-  function commitStop() {
-    isActiveRef.current = false;
-    try { recognitionRef.current?.stop(); } catch {}
-    onStop(finalRef.current.trim() || transcript.trim());
+  /* ─── actions ─────────────────────────────────────────────── */
+  function handleStop() {
+    const t = currentText();
+    stopAll();
+    onStop(t);
   }
 
-  function commitSend() {
-    isActiveRef.current = false;
-    try { recognitionRef.current?.stop(); } catch {}
-    onSend(finalRef.current.trim() || transcript.trim());
+  function handleSend() {
+    const t = currentText();
+    stopAll();
+    onSend(t);
   }
-
-  const hasText = transcript.trim().length > 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 6 }}
-      transition={{ duration: 0.16 }}
+      transition={{ duration: 0.15 }}
       className="w-full"
     >
-      {/* Live transcript */}
-      <AnimatePresence>
-        {transcript && (
-          <motion.p
-            key="transcript"
-            initial={{ opacity: 0, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="text-[14px] text-foreground/70 px-1 mb-2.5 leading-relaxed line-clamp-3"
-          >
-            {transcript}
-          </motion.p>
-        )}
-        {permError && (
-          <motion.p
-            key="error"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-[13px] text-red-400/80 px-1 mb-2.5"
-          >
-            Microphone access denied — check browser permissions.
-          </motion.p>
-        )}
-      </AnimatePresence>
+      {permError && (
+        <p className="text-[13px] text-red-400/80 px-1 mb-2">
+          Microphone access denied — check browser permissions.
+        </p>
+      )}
 
-      {/* Bar row — same pill shape as normal input */}
-      <div className="gemini-input-pill w-full px-3.5 flex items-center gap-2.5" style={{ height: 56 }}>
+      {/* Voice bar */}
+      <div className="gemini-input-pill w-full px-3.5 flex items-center gap-2.5" style={{ height: 54 }}>
 
-        {/* + attach */}
+        {/* + */}
         <button
           onClick={onAttach}
           className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90 shrink-0"
@@ -250,41 +234,38 @@ export function VoiceInputBar({ onStop, onSend, onAttach }: VoiceInputBarProps) 
           <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
         </button>
 
-        {/* Waveform */}
-        <div ref={wrapperRef} className="flex-1 h-9 relative">
-          {!ready && !permError && (
-            /* Placeholder skeleton while mic initialises */
-            <div className="absolute inset-0 flex items-center gap-[3px] px-0.5">
-              {Array.from({ length: 30 }).map((_, i) => (
+        {/* Waveform canvas container */}
+        <div ref={wrapperRef} className="flex-1 h-[36px] relative overflow-hidden">
+          {/* Placeholder skeleton bars while mic initialises */}
+          {!micReady && !permError && (
+            <div className="absolute inset-0 flex items-center gap-[3.5px]">
+              {Array.from({ length: 28 }).map((_, i) => (
                 <div
                   key={i}
-                  className="flex-1 rounded-full bg-foreground/20 animate-pulse"
-                  style={{ height: 3 + Math.abs(Math.sin(i * 0.6)) * 10 }}
+                  className="flex-1 rounded-full bg-foreground/20"
+                  style={{ height: 3 + Math.abs(Math.sin(i * 0.65)) * 11 }}
                 />
               ))}
             </div>
           )}
           <canvas
             ref={canvasRef}
-            className={cn('w-full h-full', !ready && 'opacity-0')}
+            className={cn('absolute inset-0 w-full h-full', !micReady && 'opacity-0')}
           />
         </div>
 
         {/* ■ Stop */}
         <button
-          onClick={commitStop}
-          className="w-9 h-9 rounded-[11px] bg-foreground/10 hover:bg-foreground/16 active:scale-90 transition-all flex items-center justify-center shrink-0"
+          onClick={handleStop}
+          className="w-9 h-9 rounded-[11px] bg-foreground/10 hover:bg-foreground/15 active:scale-90 transition-all flex items-center justify-center shrink-0"
         >
-          <Square className="w-[15px] h-[15px] text-foreground fill-foreground" />
+          <Square className="w-[14px] h-[14px] text-foreground fill-foreground" />
         </button>
 
         {/* ↑ Send */}
         <button
-          onClick={commitSend}
-          className={cn(
-            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90',
-            hasText ? 'bg-primary hover:opacity-90' : 'bg-foreground/12'
-          )}
+          onClick={handleSend}
+          className="w-9 h-9 rounded-full bg-primary hover:opacity-90 active:scale-90 transition-all flex items-center justify-center shrink-0"
         >
           <ArrowUp className="w-[18px] h-[18px] text-white" strokeWidth={2.2} />
         </button>
