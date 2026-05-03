@@ -10,9 +10,10 @@ const KEYS = {
   MEMORIES: 'mrrobot_memories',
   SETTINGS: 'mrrobot_settings',
   PROVIDERS: 'mrrobot_providers',
+  ACTIVE_CONV: 'mrrobot_active_conv',
 } as const;
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   agentName: 'Mr. Robot',
   theme: 'dark',
   amoledBlack: true,
@@ -52,6 +53,7 @@ interface AppContextType {
   addConversation: (conv: Conversation) => void;
   updateConversation: (id: string, updates: Partial<Conversation>) => void;
   deleteConversation: (id: string) => void;
+  clearAllConversations: () => void;
   addMessage: (convId: string, msg: Message) => void;
   updateMessage: (convId: string, msgId: string, updates: Partial<Message>) => void;
   addMemory: (mem: Memory) => void;
@@ -65,7 +67,7 @@ interface AppContextType {
   isLoaded: boolean;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
+export const AppContext = createContext<AppContextType | null>(null);
 
 async function load<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -86,23 +88,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [memories, setMemories] = useState<Memory[]>(DEFAULT_MEMORIES);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [providers, setProviders] = useState<AIProvider[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationIdState] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [convs, mems, setts, provs] = await Promise.all([
+      const [convs, mems, setts, provs, activeId] = await Promise.all([
         load<Conversation[]>(KEYS.CONVERSATIONS, []),
         load<Memory[]>(KEYS.MEMORIES, DEFAULT_MEMORIES),
         load<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS),
         load<AIProvider[]>(KEYS.PROVIDERS, []),
+        load<string | null>(KEYS.ACTIVE_CONV, null),
       ]);
       setConversations(convs);
       setMemories(mems.length ? mems : DEFAULT_MEMORIES);
       setSettings({ ...DEFAULT_SETTINGS, ...setts });
       setProviders(provs);
+      if (activeId && convs.some(c => c.id === activeId)) {
+        setActiveConversationIdState(activeId);
+      }
       setIsLoaded(true);
     })();
+  }, []);
+
+  const setActiveConversationId = useCallback((id: string | null) => {
+    setActiveConversationIdState(id);
+    save(KEYS.ACTIVE_CONV, id);
   }, []);
 
   const addConversation = useCallback((conv: Conversation) => {
@@ -129,7 +140,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       save(KEYS.CONVERSATIONS, next);
       return next;
     });
-    setActiveConversationId(prev => (prev === id ? null : prev));
+    setActiveConversationIdState(prev => {
+      if (prev === id) {
+        save(KEYS.ACTIVE_CONV, null);
+        return null;
+      }
+      return prev;
+    });
+  }, []);
+
+  const clearAllConversations = useCallback(() => {
+    setConversations([]);
+    save(KEYS.CONVERSATIONS, []);
+    setActiveConversationIdState(null);
+    save(KEYS.ACTIVE_CONV, null);
   }, []);
 
   const addMessage = useCallback((convId: string, msg: Message) => {
@@ -234,7 +258,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         conversations, memories, settings, providers,
         activeConversationId, setActiveConversationId,
-        addConversation, updateConversation, deleteConversation,
+        addConversation, updateConversation, deleteConversation, clearAllConversations,
         addMessage, updateMessage,
         addMemory, updateMemory, deleteMemory,
         updateSettings,
