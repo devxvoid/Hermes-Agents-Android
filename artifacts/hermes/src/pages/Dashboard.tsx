@@ -3,6 +3,7 @@ import { useApp } from '@/contexts/AppContext';
 import { Message, Conversation } from '@/types';
 import { MessageBubble, TypingIndicator } from '@/components/chat/MessageBubble';
 import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
+import { ToolsSheet } from '@/components/ui/ToolsSheet';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
 import { sendAIMessage } from '@/lib/ai/aiClient';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const [inputValue,   setInputValue]   = useState('');
   const [attachments,  setAttachments]  = useState<AttachedFile[]>([]);
   const [attachOpen,   setAttachOpen]   = useState(false);
+  const [toolsOpen,    setToolsOpen]    = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef   = useRef<HTMLDivElement>(null);
@@ -319,7 +321,10 @@ export default function Dashboard() {
             >
               <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
             </button>
-            <button className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90">
+            <button
+              className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
+              onClick={e => { e.stopPropagation(); setToolsOpen(true); }}
+            >
               <SlidersHorizontal className="w-[20px] h-[20px]" strokeWidth={1.8} />
             </button>
           </div>
@@ -348,6 +353,19 @@ export default function Dashboard() {
         onClose={() => setAttachOpen(false)}
         onFile={processFile}
         bottomOffset={130}
+      />
+
+      {/* Tools sheet */}
+      <ToolsSheet
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        onSelect={prompt => {
+          setInputValue(prompt);
+          setTimeout(() => {
+            textareaRef.current?.focus();
+            autoResize();
+          }, 80);
+        }}
       />
     </div>
   );
