@@ -89,7 +89,7 @@ const VALID_THEME_COLORS: ThemeColor[] = ["dynamic", "ocean", "purple", "forest"
 
 export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
   return {
-    agentName: raw.agentName || "Hermes",
+    agentName: raw.agentName || "Mr. Robot",
     responseStyle: ["concise", "balanced", "detailed"].includes(raw.responseStyle as string) ? raw.responseStyle as any : "balanced",
     useMemoryByDefault: raw.useMemoryByDefault !== undefined ? Boolean(raw.useMemoryByDefault) : true,
     activateSkillsByDefault: raw.activateSkillsByDefault !== undefined ? Boolean(raw.activateSkillsByDefault) : true,

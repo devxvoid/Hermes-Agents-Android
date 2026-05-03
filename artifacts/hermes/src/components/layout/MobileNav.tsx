@@ -13,7 +13,7 @@ const primaryNav = [
 ];
 
 const moreNav = [
-  { path: '/ai-models', label: 'AI Models', icon: Cpu      },
+  { path: '/ai-models', label: 'AI Model',  icon: Cpu      },
   { path: '/settings',  label: 'Settings',  icon: Settings },
 ];
 
@@ -21,9 +21,10 @@ export function MobileNav() {
   const [location] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
+  const isMoreActive = moreNav.some(n => location.startsWith(n.path));
+
   return (
     <>
-      {/* ── Floating pill nav — always at bottom-5, input sits above it on chat ── */}
       <nav
         data-testid="mobile-nav"
         className="md:hidden fixed bottom-5 left-5 right-5 z-50 glass-pill-nav rounded-full"
@@ -53,9 +54,12 @@ export function MobileNav() {
           })}
 
           <button onClick={() => setMoreOpen(true)} data-testid="mobile-nav-more" className="flex flex-col items-center">
-            <span className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-full">
-              <Settings className="w-5 h-5 text-muted-foreground" />
-              <span className="text-[10px] font-medium leading-none text-muted-foreground/60">More</span>
+            <span className={cn(
+              'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-full transition-all',
+              isMoreActive && 'glass-pill-active'
+            )}>
+              <Settings className={cn('w-5 h-5', isMoreActive ? 'text-primary' : 'text-muted-foreground')} />
+              <span className={cn('text-[10px] font-medium leading-none', isMoreActive ? 'text-primary' : 'text-muted-foreground/60')}>More</span>
             </span>
           </button>
         </div>
