@@ -4,6 +4,7 @@ import { Message, Conversation } from '@/types';
 import { MessageBubble, TypingIndicator } from '@/components/chat/MessageBubble';
 import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
 import { ToolsSheet } from '@/components/ui/ToolsSheet';
+import { ModelPickerSheet } from '@/components/ui/ModelPickerSheet';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
 import { sendAIMessage } from '@/lib/ai/aiClient';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +46,7 @@ export default function Dashboard() {
   const [attachments,  setAttachments]  = useState<AttachedFile[]>([]);
   const [attachOpen,   setAttachOpen]   = useState(false);
   const [toolsOpen,    setToolsOpen]    = useState(false);
+  const [modelOpen,    setModelOpen]    = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef   = useRef<HTMLDivElement>(null);
@@ -367,12 +369,15 @@ export default function Dashboard() {
 
           {/* Right: model badge + mic + analyze */}
           <div className="flex items-center gap-4">
-            <div className="gemini-speed-badge flex items-center gap-1.5 px-3.5 py-1.5 rounded-full">
+            <button
+              onClick={e => { e.stopPropagation(); setModelOpen(true); }}
+              className="gemini-speed-badge flex items-center gap-1.5 px-3.5 py-1.5 rounded-full active:scale-95 transition-transform"
+            >
               <Sparkles className="w-3.5 h-3.5 text-foreground/60" />
               <span className="text-[13px] font-medium text-foreground/70">
-                {activeProvider ? (activeProvider.selectedModel.split('/').pop()?.slice(0, 8) ?? 'AI') : 'Demo'}
+                {activeProvider ? (activeProvider.selectedModel.split('/').pop()?.slice(0, 12) ?? 'AI') : 'Demo'}
               </span>
-            </div>
+            </button>
             <button className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90">
               <Mic className="w-[22px] h-[22px]" strokeWidth={1.8} />
             </button>
@@ -403,6 +408,9 @@ export default function Dashboard() {
           }, 80);
         }}
       />
+
+      {/* Model picker sheet */}
+      <ModelPickerSheet open={modelOpen} onClose={() => setModelOpen(false)} />
     </div>
   );
 }
