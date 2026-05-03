@@ -1,4 +1,4 @@
-import { Conversation, Message, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor } from '../types';
+import { Conversation, Message, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor, Agent } from '../types';
 
 export function safeJsonParse<T>(value: string | null, fallback: T): T {
   if (!value) return fallback;
@@ -105,12 +105,28 @@ export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
   };
 }
 
+export function normalizeAgent(raw: Partial<Agent>): Agent {
+  const COLORS = ['#7C45C6','#2196B8','#1A9C97','#2D8A54','#CC2B4C','#E07B00','#4b6480'];
+  return {
+    id: raw.id || crypto.randomUUID(),
+    name: raw.name || 'Unnamed Agent',
+    instructions: raw.instructions || '',
+    responseStyle: ['concise','formal','socratic','comprehensive'].includes(raw.responseStyle as string)
+      ? raw.responseStyle as Agent['responseStyle']
+      : 'comprehensive',
+    color: raw.color || COLORS[Math.floor(Math.random() * COLORS.length)],
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt || new Date().toISOString(),
+  };
+}
+
 export const StorageKeys = {
   CONVERSATIONS: "hermes_conversations",
   MEMORIES: "hermes_memories",
   SKILLS: "hermes_skills",
   PROVIDERS: "hermes_providers",
-  SETTINGS: "hermes_settings"
+  SETTINGS: "hermes_settings",
+  AGENTS: "hermes_agents",
 };
 
 export function getStorageData<T>(key: string, normalizer: (item: any) => any, defaultIfEmpty: T[] = []): T[] {

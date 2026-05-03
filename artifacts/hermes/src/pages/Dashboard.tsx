@@ -34,7 +34,7 @@ interface AttachedFile { name: string; content: string; type: string; }
 export default function Dashboard() {
   const {
     settings, memories, skills, providers,
-    conversations, addConversation, updateConversation,
+    conversations, addConversation, updateConversation, agents,
   } = useApp();
   const { toast } = useToast();
 
@@ -210,9 +210,16 @@ export default function Dashboard() {
   }, [convId, conversations, memories, skills, settings, providers, attachments, addConversation, updateConversation, scrollToBottom, toast]);
 
   function buildSystemPrompt(usedMems: typeof memories, triggered: typeof skills) {
-    let p = `You are ${settings.agentName}, a professional autonomous AI assistant. Be clear, practical, and concise.`;
-    if (settings.responseStyle === 'concise') p += ' Keep responses brief.';
-    if (settings.responseStyle === 'detailed') p += ' Provide detailed responses.';
+    const activeAgent = agents.find(a => a.id === settings.activeAgentId);
+    let p = activeAgent?.instructions
+      ? activeAgent.instructions
+      : `You are ${settings.agentName}, a professional autonomous AI assistant. Be clear, practical, and concise.`;
+    const style = activeAgent?.responseStyle ?? settings.responseStyle;
+    if (style === 'concise')       p += '\n\nKeep responses brief and direct.';
+    if (style === 'formal')        p += '\n\nUse a formal, professional tone.';
+    if (style === 'socratic')      p += '\n\nAsk clarifying questions before answering when useful.';
+    if (style === 'comprehensive') p += '\n\nProvide detailed, thorough responses.';
+    if (style === 'detailed')      p += '\n\nProvide detailed responses.';
     if (usedMems.length  > 0) p += '\n\nUser memory:\n'  + usedMems.map(m => `- ${m.content}`).join('\n');
     if (triggered.length > 0) p += '\n\nActive skills:\n' + triggered.map(s => `- ${s.name}: ${s.instructionPrompt}`).join('\n');
     return p;

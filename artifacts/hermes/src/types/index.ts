@@ -3,6 +3,15 @@ export interface Message { id: string; role: "user" | "assistant"; content: stri
 export interface Memory { id: string; title: string; content: string; category: string; tags: string[]; active: boolean; createdAt: string; updatedAt: string; lastUsedAt?: string; usageCount: number; }
 export interface Skill { id: string; name: string; description: string; category: string; triggerKeywords: string[]; instructionPrompt: string; enabled: boolean; createdAt: string; updatedAt: string; lastUsedAt?: string; usageCount: number; }
 export type ThemeColor = "dynamic" | "ocean" | "purple" | "forest" | "slate" | "rose";
+export interface Agent {
+  id: string;
+  name: string;
+  instructions: string;
+  responseStyle: "concise" | "formal" | "socratic" | "comprehensive";
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface AppSettings {
   agentName: string;
   responseStyle: "concise" | "balanced" | "detailed";
@@ -16,6 +25,7 @@ export interface AppSettings {
   hackerMode: boolean;
   activeProviderId?: string;
   activeModelId?: string;
+  activeAgentId?: string;
   profileImage?: string;
 }
 export interface AIProviderConfig { id: string; name: string; type: "openai-compatible"|"anthropic"|"gemini"|"custom-rest"|"local-openai-compatible"; mode: "online"|"local"; apiKey?: string; baseUrl: string; selectedModel: string; customModels: string[]; enabled: boolean; supportsStreaming: boolean; supportsSystemPrompt: boolean; status: "not_configured"|"connected"|"error"|"testing"; lastTestedAt?: string; createdAt: string; updatedAt: string; }

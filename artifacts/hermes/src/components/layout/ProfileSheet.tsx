@@ -189,7 +189,7 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
 
             {/* Manage Agent button */}
             <button
-              onClick={() => navigate('/settings')}
+              onClick={() => navigate('/agents')}
               className="w-full max-w-[260px] border border-foreground/15 rounded-full py-2.5 text-sm font-semibold text-foreground/80 hover:bg-foreground/[0.05] transition-colors"
             >
               Manage Agent Settings
