@@ -88,7 +88,7 @@ function ChatContent() {
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [] };
     const updatedMessages = [...(conv.messages || []), userMsg];
     const title = conv.messages.length === 0 ? text.slice(0, 60) : conv.title;
-    updateConversation(convId, { messages: updatedMessages, title, updatedAt: new Date().toISOString() });
+    updateConversation(convId!, { messages: updatedMessages, title, updatedAt: new Date().toISOString() });
     setIsTyping(true); scrollToBottom();
 
     try {
@@ -113,10 +113,10 @@ function ChatContent() {
       }
 
       const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: responseText, createdAt: new Date().toISOString(), usedMemoryIds: usedMems.map(m => m.id), triggeredSkillIds: triggeredSkills.map(s => s.id), metadata: { providerId: activeProvider?.id || 'demo', providerName, model, mode, latencyMs: Date.now() - startTime, streaming: false, usedMemoryIds: usedMems.map(m => m.id), triggeredSkillIds: triggeredSkills.map(s => s.id) } };
-      updateConversation(convId, { messages: [...updatedMessages, assistantMsg], updatedAt: new Date().toISOString() });
+      updateConversation(convId!, { messages: [...updatedMessages, assistantMsg], updatedAt: new Date().toISOString() });
     } catch (err: any) {
       const errMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: `Error: ${err.message || 'Something went wrong.'}`, createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [], metadata: { providerId: 'error', providerName: 'Error', model: 'N/A', mode: 'demo', streaming: false, usedMemoryIds: [], triggeredSkillIds: [], error: err.message } };
-      updateConversation(convId, { messages: [...updatedMessages, errMsg], updatedAt: new Date().toISOString() });
+      updateConversation(convId!, { messages: [...updatedMessages, errMsg], updatedAt: new Date().toISOString() });
       toast({ title: 'AI Error', description: err.message, variant: 'destructive' });
     } finally { setIsTyping(false); scrollToBottom(); }
   }, [activeConvId, conversations, memories, skills, settings, providers, addConversation, updateConversation, setActiveConversationId, setLocation, scrollToBottom, toast]);

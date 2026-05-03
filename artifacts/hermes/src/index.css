@@ -92,34 +92,34 @@
 }
 
 /* ═══════════════════════════════════════════════
-   DARK MODE  — GitHub Store palette
-   Background: near-black deep navy
-   Card: elevated surface layers
+   DARK MODE  — Gemini pure-black palette
+   Background: #000000 pure black
+   Card: #1C1C1E elevated surfaces (iOS/Gemini)
    ═══════════════════════════════════════════════ */
 .dark {
   /* ── Surface hierarchy ── */
-  --background: 229 24% 6%;        /* deepest bg  #0C0E16 */
-  --card: 228 22% 10%;             /* surface 1   #13151F */
-  --card-border: 228 18% 15%;      /* subtle border */
-  --popover: 228 22% 12%;
-  --popover-border: 228 18% 18%;
-  --sidebar: 230 26% 5%;           /* sidebar even deeper */
-  --sidebar-border: 228 18% 12%;
-  --muted: 228 18% 13%;
-  --secondary: 228 18% 14%;
+  --background: 0 0% 0%;           /* #000000 pure black */
+  --card: 0 0% 11%;                /* #1C1C1E surface */
+  --card-border: 0 0% 17%;         /* subtle divider */
+  --popover: 0 0% 11%;
+  --popover-border: 0 0% 18%;
+  --sidebar: 0 0% 5%;              /* sidebar slightly lifted */
+  --sidebar-border: 0 0% 11%;
+  --muted: 0 0% 13%;
+  --secondary: 0 0% 14%;
 
   /* ── Text ── */
-  --foreground: 210 25% 94%;
-  --card-foreground: 210 25% 94%;
-  --popover-foreground: 210 25% 94%;
-  --sidebar-foreground: 210 25% 92%;
-  --secondary-foreground: 210 22% 88%;
-  --muted-foreground: 215 14% 52%;
-  --sidebar-accent-foreground: 210 22% 88%;
+  --foreground: 0 0% 94%;
+  --card-foreground: 0 0% 94%;
+  --popover-foreground: 0 0% 94%;
+  --sidebar-foreground: 0 0% 92%;
+  --secondary-foreground: 0 0% 86%;
+  --muted-foreground: 0 0% 50%;
+  --sidebar-accent-foreground: 0 0% 86%;
 
   /* ── Colours ── */
-  --border: 228 18% 14%;
-  --input: 228 18% 14%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
   --ring: 200 85% 62%;
   --primary: 200 85% 62%;
   --primary-foreground: 229 24% 6%;
@@ -183,15 +183,15 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.95);
   }
   .dark .glass-card {
-    background: hsl(var(--card));
+    background: #1c1c1e;
     backdrop-filter: none;
-    border-color: hsl(var(--card-border));
-    box-shadow: 0 1px 3px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.18);
+    border-color: rgba(255,255,255,0.07);
+    box-shadow: none;
   }
   .dark .glass-card:hover {
-    border-color: hsl(var(--primary) / 0.22);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.35), 0 6px 20px rgba(0,0,0,0.22);
-    transform: translateY(-1px);
+    border-color: hsl(var(--primary) / 0.20);
+    box-shadow: none;
+    transform: none;
   }
 
   /* ── Strong hero card ─────────────────────────────── */
@@ -203,10 +203,10 @@
     box-shadow: 0 4px 18px rgba(0,0,0,0.09), inset 0 1.5px 0 rgba(255,255,255,0.94);
   }
   .dark .glass-strong {
-    background: hsl(228 22% 12%);
+    background: #242426;
     backdrop-filter: none;
-    border-color: hsl(228 18% 18%);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.40), 0 1px 0 rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 2px 20px rgba(0,0,0,0.5);
   }
 
   /* ── Sidebar ──────────────────────────────────────── */
@@ -217,9 +217,9 @@
     border-right: 1px solid rgba(0,0,0,0.07);
   }
   .dark .glass-sidebar {
-    background: hsl(var(--sidebar));
+    background: #0d0d0d;
     backdrop-filter: none;
-    border-right-color: hsl(var(--sidebar-border));
+    border-right-color: rgba(255,255,255,0.06);
   }
 
   /* ── Chat bar ─────────────────────────────────────── */
@@ -231,10 +231,10 @@
     box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
   }
   .dark .glass-bar {
-    background: hsl(229 24% 8%);
+    background: #111113;
     backdrop-filter: none;
-    border-top-color: hsl(var(--border));
-    box-shadow: 0 -1px 0 hsl(var(--border));
+    border-top-color: rgba(255,255,255,0.07);
+    box-shadow: none;
   }
 
   /* ── Input ────────────────────────────────────────── */
@@ -331,13 +331,11 @@
       0 4px 16px rgba(0,0,0,0.06);
   }
   .dark .liquid-glass-topbar {
-    background: rgba(14,16,23,0.80);
-    backdrop-filter: blur(32px) saturate(180%);
-    -webkit-backdrop-filter: blur(32px) saturate(180%);
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    box-shadow:
-      0 1px 0 rgba(255,255,255,0.04) inset,
-      0 4px 20px rgba(0,0,0,0.30);
+    background: #000000;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: none;
+    box-shadow: none;
   }
 
   /* ══════════════════════════════════════════════════
@@ -470,5 +468,91 @@
   @keyframes shimmer {
     0%   { background-position: 200% center; }
     100% { background-position: -200% center; }
+  }
+
+  /* ══════════════════════════════════════════════════
+     GEMINI DESIGN LANGUAGE — component utilities
+     ══════════════════════════════════════════════════ */
+
+  /* Left-side drawer panel */
+  .drawer-panel {
+    background: #1c1c1e;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    will-change: transform;
+  }
+
+  /* Quick-action suggestion chip (home screen) */
+  .gemini-chip {
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.10);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .gemini-chip:hover {
+    background: rgba(0,0,0,0.10);
+  }
+  .gemini-chip:active {
+    transform: scale(0.97);
+  }
+  .dark .gemini-chip {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.10);
+  }
+  .dark .gemini-chip:hover {
+    background: rgba(255,255,255,0.11);
+  }
+
+  /* Home-screen bottom input pill */
+  .gemini-input-pill {
+    background: rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.10);
+    border-radius: 28px;
+    cursor: text;
+    transition: border-color 0.15s;
+  }
+  .gemini-input-pill:hover {
+    border-color: rgba(0,0,0,0.18);
+  }
+  .dark .gemini-input-pill {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.10);
+  }
+  .dark .gemini-input-pill:hover {
+    border-color: rgba(255,255,255,0.18);
+  }
+
+  /* Bottom toolbar container */
+  .gemini-bottom-bar {
+    background: hsl(var(--background));
+  }
+
+  /* "Fast" speed chip */
+  .gemini-speed-badge {
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.10);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .gemini-speed-badge:hover {
+    background: rgba(0,0,0,0.10);
+  }
+  .dark .gemini-speed-badge {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.10);
+  }
+  .dark .gemini-speed-badge:hover {
+    background: rgba(255,255,255,0.11);
+  }
+
+  /* Profile sheet dark background */
+  .profile-sheet-bg {
+    background: hsl(var(--card));
+  }
+  .dark .profile-sheet-bg {
+    background: #1c1c1e;
+  }
+
+  /* Hide bottom mobile nav if it still renders */
+  .mobile-nav-hidden {
+    display: none !important;
   }
 }
