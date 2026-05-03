@@ -6,7 +6,7 @@ import { MessageBubble, TypingIndicator } from '@/components/chat/MessageBubble'
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
-import { sendAIMessage } from '@/lib/ai/aiClient';
+import { sendAIMessage, sendAIMessageStream } from '@/lib/ai/aiClient';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Brain, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ function ChatContent() {
           addConversation, updateConversation, setActiveConversationId } = useApp();
   const { toast } = useToast();
   const [isTyping, setIsTyping] = useState(false);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +59,7 @@ function ChatContent() {
     }, 50);
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [activeConv?.messages?.length, isTyping, scrollToBottom]);
+  useEffect(() => { scrollToBottom(); }, [activeConv?.messages?.length, isTyping, streamingContent, scrollToBottom]);
 
   const createNewConversation = useCallback(() => {
     const id = crypto.randomUUID();
@@ -92,24 +93,63 @@ function ChatContent() {
 
       const activeProvider = providers.find(p => p.id === settings.activeProviderId && p.enabled && p.status === 'connected');
       const startTime = Date.now();
-      let responseText = ''; let mode: 'online' | 'local' | 'demo' = 'demo'; let providerName = 'Demo'; let model = 'Demo';
+      let responseText = '';
+      let mode: 'online' | 'local' | 'demo' = 'demo';
+      let providerName = 'Demo';
+      let model = 'Demo';
 
       if (activeProvider) {
         const sysp = buildSystemPrompt(usedMems, triggeredSkills);
-        responseText = await sendAIMessage(updatedMessages.map(m => ({ role: m.role, content: m.content })), sysp, activeProvider, {});
-        mode = activeProvider.mode as 'online' | 'local'; providerName = activeProvider.name; model = activeProvider.selectedModel;
+        const msgList = updatedMessages.map(m => ({ role: m.role, content: m.content }));
+
+        if (settings.streamingEnabled) {
+          setIsTyping(false);
+          setStreamingContent('');
+          responseText = await sendAIMessageStream(msgList, sysp, activeProvider, {}, (chunk) => {
+            setStreamingContent(prev => (prev ?? '') + chunk);
+          });
+          setStreamingContent(null);
+        } else {
+          responseText = await sendAIMessage(msgList, sysp, activeProvider, {});
+        }
+
+        mode = activeProvider.mode as 'online' | 'local';
+        providerName = activeProvider.name;
+        model = activeProvider.selectedModel;
       } else {
         await new Promise(r => setTimeout(r, 400 + Math.random() * 400));
         responseText = generateDemoResponse(classifyMessageIntent(text), text, usedMems, triggeredSkills, settings);
       }
 
-      const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: responseText, createdAt: new Date().toISOString(), usedMemoryIds: usedMems.map(m => m.id), triggeredSkillIds: triggeredSkills.map(s => s.id), metadata: { providerId: activeProvider?.id || 'demo', providerName, model, mode, latencyMs: Date.now() - startTime, streaming: false, usedMemoryIds: usedMems.map(m => m.id), triggeredSkillIds: triggeredSkills.map(s => s.id) } };
+      const assistantMsg: Message = {
+        id: crypto.randomUUID(), role: 'assistant', content: responseText,
+        createdAt: new Date().toISOString(),
+        usedMemoryIds: usedMems.map(m => m.id),
+        triggeredSkillIds: triggeredSkills.map(s => s.id),
+        metadata: {
+          providerId: activeProvider?.id || 'demo', providerName, model, mode,
+          latencyMs: Date.now() - startTime,
+          streaming: settings.streamingEnabled && !!activeProvider,
+          usedMemoryIds: usedMems.map(m => m.id),
+          triggeredSkillIds: triggeredSkills.map(s => s.id),
+        },
+      };
       updateConversation(convId!, { messages: [...updatedMessages, assistantMsg], updatedAt: new Date().toISOString() });
     } catch (err: any) {
-      const errMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: `Error: ${err.message || 'Something went wrong.'}`, createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [], metadata: { providerId: 'error', providerName: 'Error', model: 'N/A', mode: 'demo', streaming: false, usedMemoryIds: [], triggeredSkillIds: [], error: err.message } };
+      setStreamingContent(null);
+      const errMsg: Message = {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: `Error: ${err.message || 'Something went wrong.'}`,
+        createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+        metadata: { providerId: 'error', providerName: 'Error', model: 'N/A', mode: 'demo', streaming: false, usedMemoryIds: [], triggeredSkillIds: [], error: err.message },
+      };
       updateConversation(convId!, { messages: [...updatedMessages, errMsg], updatedAt: new Date().toISOString() });
       toast({ title: 'AI Error', description: err.message, variant: 'destructive' });
-    } finally { setIsTyping(false); scrollToBottom(); }
+    } finally {
+      setIsTyping(false);
+      setStreamingContent(null);
+      scrollToBottom();
+    }
   }, [activeConvId, conversations, memories, skills, settings, providers, addConversation, updateConversation, setActiveConversationId, setLocation, scrollToBottom, toast]);
 
   function buildSystemPrompt(usedMems: typeof memories, triggeredSkills: typeof skills) {
@@ -126,6 +166,11 @@ function ChatContent() {
 
   const activeProvider = providers.find(p => p.id === settings.activeProviderId && p.status === 'connected');
   const messages = activeConv?.messages || [];
+
+  const streamingMsg: Message | null = streamingContent !== null ? {
+    id: 'streaming', role: 'assistant', content: streamingContent,
+    createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+  } : null;
 
   return (
     <div className="flex flex-col h-screen" data-testid="chat-page">
@@ -165,17 +210,22 @@ function ChatContent() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-4"
         data-testid="chat-messages"
-        style={{
-          paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
-        }}
+        style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}
       >
         {messages.map(msg => <MessageBubble key={msg.id} message={msg} memories={memories} skills={skills} />)}
         {isTyping && <TypingIndicator />}
+        {streamingMsg && (
+          <MessageBubble message={streamingMsg} memories={memories} skills={skills} streaming />
+        )}
       </div>
 
       {/* ── Input bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 md:left-60">
-        <ChatInput onSend={handleSend} onNewChat={createNewConversation} disabled={isTyping} />
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[220px]">
+        <ChatInput
+          onSend={handleSend}
+          onNewChat={createNewConversation}
+          disabled={isTyping || streamingContent !== null}
+        />
       </div>
     </div>
   );

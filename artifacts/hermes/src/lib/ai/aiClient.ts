@@ -1,7 +1,7 @@
 import { AIProviderConfig } from '../../types';
-import { testOpenAICompatibleConnection, sendOpenAICompatibleMessage, fetchOpenAIModels } from './openAICompatibleClient';
-import { testAnthropicConnection, sendAnthropicMessage } from './anthropicClient';
-import { testGeminiConnection, sendGeminiMessage } from './geminiClient';
+import { testOpenAICompatibleConnection, sendOpenAICompatibleMessage, sendOpenAICompatibleMessageStream, fetchOpenAIModels } from './openAICompatibleClient';
+import { testAnthropicConnection, sendAnthropicMessage, sendAnthropicMessageStream } from './anthropicClient';
+import { testGeminiConnection, sendGeminiMessage, sendGeminiMessageStream } from './geminiClient';
 import { testLocalRuntimeConnection, sendLocalRuntimeMessage, fetchLocalModels } from './localRuntimeClient';
 
 export async function testProviderConnection(config: AIProviderConfig): Promise<{success: boolean; message: string; latencyMs: number}> {
@@ -34,6 +34,29 @@ export async function sendAIMessage(messages: any[], systemPrompt: string, confi
     case "gemini":
       return await sendGeminiMessage(messages, systemPrompt, config, options);
     case "local-openai-compatible":
+      return await sendLocalRuntimeMessage(messages, systemPrompt, config, options);
+    default:
+      throw new Error("Unknown provider type");
+  }
+}
+
+export async function sendAIMessageStream(
+  messages: any[],
+  systemPrompt: string,
+  config: AIProviderConfig,
+  options: any = {},
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  switch (config.type) {
+    case "openai-compatible":
+    case "custom-rest":
+      return await sendOpenAICompatibleMessageStream(messages, systemPrompt, config, options, onChunk);
+    case "anthropic":
+      return await sendAnthropicMessageStream(messages, systemPrompt, config, options, onChunk);
+    case "gemini":
+      return await sendGeminiMessageStream(messages, systemPrompt, config, options, onChunk);
+    case "local-openai-compatible":
+      // Local runtimes fall back to non-streaming
       return await sendLocalRuntimeMessage(messages, systemPrompt, config, options);
     default:
       throw new Error("Unknown provider type");

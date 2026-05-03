@@ -46,7 +46,7 @@ export async function sendAnthropicMessage(messages: {role: string; content: str
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(60000),
   });
 
   if (!response.ok) {
@@ -57,4 +57,65 @@ export async function sendAnthropicMessage(messages: {role: string; content: str
 
   const data = await response.json();
   return data.content?.[0]?.text || '';
+}
+
+export async function sendAnthropicMessageStream(
+  messages: {role: string; content: string}[],
+  systemPrompt: string,
+  config: AIProviderConfig,
+  options: {temperature?: number; maxTokens?: number} = {},
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  const body: any = {
+    model: config.selectedModel,
+    max_tokens: options.maxTokens ?? 2048,
+    messages: messages.filter(m => m.role !== 'system'),
+    stream: true,
+  };
+  if (systemPrompt) body.system = systemPrompt;
+  if (options.temperature !== undefined) body.temperature = options.temperature;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': config.apiKey || '',
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120000),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Invalid Anthropic API key.');
+    if (response.status === 429) throw new Error('Anthropic rate limit reached.');
+    throw new Error(`Anthropic error (${response.status})`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+          const text = parsed.delta.text;
+          if (text) { fullText += text; onChunk(text); }
+        }
+      } catch {}
+    }
+  }
+
+  return fullText;
 }

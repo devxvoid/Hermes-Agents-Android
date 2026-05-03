@@ -8,6 +8,7 @@ interface MessageBubbleProps {
   message: Message;
   memories?: Memory[];
   skills?: Skill[];
+  streaming?: boolean;
 }
 
 /* ── File download helper ─────────────────────────────────────── */
@@ -40,7 +41,6 @@ function parseContent(raw: string): Segment[] {
   const segments: Segment[] = [];
   let remaining = raw;
 
-  // Match [FILE: name] ... [/FILE] blocks and code fences alternately
   const BLOCK_RE = /(\[FILE:\s*([^\]]+)\]\n([\s\S]*?)\[\/FILE\]|```([a-zA-Z0-9._\-/]*)\s*([^\n]*)?\n([\s\S]*?)```)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -50,15 +50,12 @@ function parseContent(raw: string): Segment[] {
     if (before) segments.push({ type: 'text', content: before });
 
     if (match[1].startsWith('[FILE:')) {
-      // [FILE: filename]\ncontent\n[/FILE]
       segments.push({ type: 'file', filename: match[2].trim(), content: match[3] });
     } else {
-      // Code block — extract filename from lang specifier or first-line comment
       let lang = match[4] || '';
       const hint = match[5]?.trim() || '';
       const codeBody = match[6] || '';
 
-      // Lang may contain a filename e.g. "typescript src/App.tsx" or "python"
       let filename: string | undefined;
       if (lang.includes('/') || lang.includes('.')) {
         filename = lang;
@@ -66,11 +63,9 @@ function parseContent(raw: string): Segment[] {
       } else if (hint && (hint.includes('/') || hint.includes('.'))) {
         filename = hint;
       } else if (hint && !hint.includes(' ')) {
-        // single-word hint without extension treated as filename if looks like one
         filename = hint || undefined;
       }
 
-      // Also check first line for "// filename.ext" or "# filename.ext"
       if (!filename) {
         const firstLine = codeBody.split('\n')[0].trim();
         const commentMatch = firstLine.match(/^(?:\/\/|#|--|\/\*)\s+([\w.\-/]+\.\w+)$/);
@@ -94,6 +89,81 @@ function guessLangFromFilename(filename: string): string {
   return map[ext] || ext || 'text';
 }
 
+/* ── Markdown text renderer ───────────────────────────────────── */
+function renderInline(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
+      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2)
+      return <code key={i} className="bg-muted/70 rounded px-1 py-0.5 text-[11.5px] font-mono text-primary/90">{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function MarkdownText({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.startsWith('### ')) {
+      elements.push(<h3 key={i} className="text-[13.5px] font-bold mt-3 mb-1 text-foreground">{renderInline(line.slice(4))}</h3>);
+    } else if (line.startsWith('## ')) {
+      elements.push(<h2 key={i} className="text-[14.5px] font-bold mt-3.5 mb-1.5 text-foreground">{renderInline(line.slice(3))}</h2>);
+    } else if (line.startsWith('# ')) {
+      elements.push(<h1 key={i} className="text-[15.5px] font-bold mt-4 mb-2 text-foreground">{renderInline(line.slice(2))}</h1>);
+    } else if (line.match(/^[-*+] /)) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].match(/^[-*+] /)) {
+        items.push(lines[i].slice(2));
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${i}`} className="list-disc pl-5 space-y-0.5 my-1.5 text-[13.5px]">
+          {items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}
+        </ul>
+      );
+      continue;
+    } else if (line.match(/^\d+\. /)) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].match(/^\d+\. /)) {
+        items.push(lines[i].replace(/^\d+\. /, ''));
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${i}`} className="list-decimal pl-5 space-y-0.5 my-1.5 text-[13.5px]">
+          {items.map((it, j) => <li key={j}>{renderInline(it)}</li>)}
+        </ol>
+      );
+      continue;
+    } else if (line.startsWith('> ')) {
+      elements.push(
+        <blockquote key={i} className="border-l-[3px] border-primary/40 pl-3 text-muted-foreground italic my-1.5 text-[13px]">
+          {renderInline(line.slice(2))}
+        </blockquote>
+      );
+    } else if (line === '---' || line === '***' || line === '___') {
+      elements.push(<hr key={i} className="border-border/50 my-3" />);
+    } else if (line.trim() === '') {
+      elements.push(<div key={i} className="h-1.5" />);
+    } else {
+      elements.push(
+        <p key={i} className="leading-relaxed text-[13.5px]">
+          {renderInline(line)}
+        </p>
+      );
+    }
+    i++;
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
 /* ── Code block renderer ──────────────────────────────────────── */
 function CodeBlock({ lang, filename, content }: { lang: string; filename?: string; content: string }) {
   const [copied, setCopied] = useState(false);
@@ -108,7 +178,6 @@ function CodeBlock({ lang, filename, content }: { lang: string; filename?: strin
 
   return (
     <div className="rounded-xl overflow-hidden border border-border/60 text-[12.5px] my-1.5">
-      {/* Header */}
       <div className="flex items-center justify-between px-3.5 py-2 bg-muted/60 border-b border-border/50">
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
@@ -138,7 +207,6 @@ function CodeBlock({ lang, filename, content }: { lang: string; filename?: strin
           </button>
         </div>
       </div>
-      {/* Code */}
       <pre className="overflow-x-auto p-3.5 bg-muted/30">
         <code className="font-mono text-[12.5px] leading-relaxed text-foreground/90 whitespace-pre break-normal">
           {content.trim()}
@@ -189,7 +257,7 @@ function FileBlock({ filename, content }: { filename: string; content: string })
 }
 
 /* ── Rendered message content ─────────────────────────────────── */
-function MessageContent({ content }: { content: string }) {
+function MessageContent({ content, streaming }: { content: string; streaming?: boolean }) {
   const segments = parseContent(content);
 
   return (
@@ -201,19 +269,17 @@ function MessageContent({ content }: { content: string }) {
         if (seg.type === 'file') {
           return <FileBlock key={i} filename={seg.filename} content={seg.content} />;
         }
-        // Text — render with line breaks preserved
-        return (
-          <span key={i} className="whitespace-pre-wrap break-words">
-            {seg.content}
-          </span>
-        );
+        return <MarkdownText key={i} content={seg.content} />;
       })}
+      {streaming && (
+        <span className="inline-block w-[2px] h-[1em] bg-primary/70 animate-pulse ml-0.5 align-middle" />
+      )}
     </div>
   );
 }
 
 /* ── Main MessageBubble ───────────────────────────────────────── */
-export function MessageBubble({ message, memories = [], skills = [] }: MessageBubbleProps) {
+export function MessageBubble({ message, memories = [], skills = [], streaming }: MessageBubbleProps) {
   const [metaOpen, setMetaOpen] = useState(false);
   const isUser = message.role === 'user';
   const usedMems   = memories.filter(m => message.usedMemoryIds?.includes(m.id));
@@ -242,7 +308,7 @@ export function MessageBubble({ message, memories = [], skills = [] }: MessageBu
         )}>
           {isUser
             ? <span className="whitespace-pre-wrap break-words">{message.content}</span>
-            : <MessageContent content={message.content} />
+            : <MessageContent content={message.content} streaming={streaming} />
           }
         </div>
 
@@ -263,20 +329,22 @@ export function MessageBubble({ message, memories = [], skills = [] }: MessageBu
         )}
 
         {/* Timestamp + meta toggle */}
-        <div className={cn('flex items-center gap-2 px-1', isUser ? 'flex-row-reverse' : 'flex-row')}>
-          <span className="text-[10px] text-muted-foreground/35 opacity-0 group-hover:opacity-100 transition-opacity">
-            {format(new Date(message.createdAt), 'HH:mm')}
-          </span>
-          {!isUser && hasMeta && (
-            <button
-              onClick={() => setMetaOpen(o => !o)}
-              className="flex items-center gap-0.5 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
-            >
-              {metaOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-              {message.metadata?.mode === 'demo' ? 'demo' : (message.metadata?.model?.split('/').pop() || 'detail')}
-            </button>
-          )}
-        </div>
+        {!streaming && (
+          <div className={cn('flex items-center gap-2 px-1', isUser ? 'flex-row-reverse' : 'flex-row')}>
+            <span className="text-[10px] text-muted-foreground/35 opacity-0 group-hover:opacity-100 transition-opacity">
+              {format(new Date(message.createdAt), 'HH:mm')}
+            </span>
+            {!isUser && hasMeta && (
+              <button
+                onClick={() => setMetaOpen(o => !o)}
+                className="flex items-center gap-0.5 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
+              >
+                {metaOpen ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                {message.metadata?.mode === 'demo' ? 'demo' : (message.metadata?.model?.split('/').pop() || 'detail')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Expanded metadata */}
         {!isUser && hasMeta && metaOpen && (

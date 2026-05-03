@@ -7,7 +7,7 @@ import { ToolsSheet } from '@/components/ui/ToolsSheet';
 import { ModelPickerSheet } from '@/components/ui/ModelPickerSheet';
 import { VoiceInputBar } from '@/components/ui/VoiceInputBar';
 import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
-import { sendAIMessage } from '@/lib/ai/aiClient';
+import { sendAIMessage, sendAIMessageStream } from '@/lib/ai/aiClient';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,14 +42,15 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   /* ── Local state ── */
-  const [convId,       setConvId]       = useState<string | null>(null);
-  const [isTyping,     setIsTyping]     = useState(false);
-  const [inputValue,   setInputValue]   = useState('');
-  const [attachments,  setAttachments]  = useState<AttachedFile[]>([]);
-  const [attachOpen,   setAttachOpen]   = useState(false);
-  const [toolsOpen,    setToolsOpen]    = useState(false);
-  const [modelOpen,    setModelOpen]    = useState(false);
-  const [voiceActive,  setVoiceActive]  = useState(false);
+  const [convId,          setConvId]          = useState<string | null>(null);
+  const [isTyping,        setIsTyping]        = useState(false);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [inputValue,      setInputValue]      = useState('');
+  const [attachments,     setAttachments]     = useState<AttachedFile[]>([]);
+  const [attachOpen,      setAttachOpen]      = useState(false);
+  const [toolsOpen,       setToolsOpen]       = useState(false);
+  const [modelOpen,       setModelOpen]       = useState(false);
+  const [voiceActive,     setVoiceActive]     = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef   = useRef<HTMLDivElement>(null);
@@ -57,7 +58,7 @@ export default function Dashboard() {
   /* ── Derived ── */
   const activeConv = convId ? conversations.find(c => c.id === convId) : null;
   const messages   = activeConv?.messages ?? [];
-  const isEmpty    = messages.length === 0 && !isTyping;
+  const isEmpty    = messages.length === 0 && !isTyping && streamingContent === null;
   const activeProvider = providers.find(
     p => p.id === settings.activeProviderId && p.enabled && p.status === 'connected'
   );
@@ -75,6 +76,7 @@ export default function Dashboard() {
       setInputValue('');
       setAttachments([]);
       setIsTyping(false);
+      setStreamingContent(null);
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     };
     window.addEventListener('mr-robot-new-chat', reset);
@@ -87,7 +89,7 @@ export default function Dashboard() {
       if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, 50);
   }, []);
-  useEffect(() => { scrollToBottom(); }, [messages.length, isTyping, scrollToBottom]);
+  useEffect(() => { scrollToBottom(); }, [messages.length, isTyping, streamingContent, scrollToBottom]);
 
   /* ── Textarea auto-resize ── */
   const autoResize = useCallback(() => {
@@ -173,10 +175,19 @@ export default function Dashboard() {
 
       if (activeProvider) {
         const sysp = buildSystemPrompt(usedMems, triggered);
-        responseText = await sendAIMessage(
-          updated.map(m => ({ role: m.role, content: m.content })),
-          sysp, activeProvider, {}
-        );
+        const msgList = updated.map(m => ({ role: m.role, content: m.content }));
+
+        if (settings.streamingEnabled) {
+          setIsTyping(false);
+          setStreamingContent('');
+          responseText = await sendAIMessageStream(msgList, sysp, activeProvider, {}, (chunk) => {
+            setStreamingContent(prev => (prev ?? '') + chunk);
+          });
+          setStreamingContent(null);
+        } else {
+          responseText = await sendAIMessage(msgList, sysp, activeProvider, {});
+        }
+
         mode = activeProvider.mode as 'online' | 'local';
         providerName = activeProvider.name;
         model = activeProvider.selectedModel;
@@ -192,13 +203,14 @@ export default function Dashboard() {
         triggeredSkillIds: triggered.map(s => s.id),
         metadata: {
           providerId: activeProvider?.id ?? 'demo', providerName, model, mode,
-          latencyMs: Date.now() - t0, streaming: false,
+          latencyMs: Date.now() - t0, streaming: settings.streamingEnabled && !!activeProvider,
           usedMemoryIds: usedMems.map(m => m.id),
           triggeredSkillIds: triggered.map(s => s.id),
         },
       };
       updateConversation(cid!, { messages: [...updated, assistantMsg], updatedAt: new Date().toISOString() });
     } catch (err: any) {
+      setStreamingContent(null);
       const errMsg: Message = {
         id: crypto.randomUUID(), role: 'assistant',
         content: `Error: ${err.message ?? 'Something went wrong.'}`,
@@ -209,6 +221,7 @@ export default function Dashboard() {
       toast({ title: 'AI Error', description: err.message, variant: 'destructive' });
     } finally {
       setIsTyping(false);
+      setStreamingContent(null);
       scrollToBottom();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,6 +246,12 @@ export default function Dashboard() {
   /* ── Bottom bar height estimate for scroll padding ── */
   const BOTTOM_BAR_H = attachments.length > 0 ? 160 : 128;
 
+  /* ── Streaming fake message for live rendering ── */
+  const streamingMsg: Message | null = streamingContent !== null ? {
+    id: 'streaming', role: 'assistant', content: streamingContent,
+    createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+  } : null;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
 
@@ -240,7 +259,6 @@ export default function Dashboard() {
       {isEmpty ? (
         <div className="flex-1 px-6 pt-10 md:pt-16" style={{ paddingBottom: BOTTOM_BAR_H + 16 }}>
           {settings.hackerMode ? (
-            /* ── Hacker terminal home ── */
             <div className="mb-10">
               <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3"
                 style={{ color: 'rgba(0,255,65,0.55)' }}>
@@ -255,7 +273,6 @@ export default function Dashboard() {
               </p>
             </div>
           ) : (
-            /* ── Normal home ── */
             <div className="mb-10">
               <p className="text-base text-foreground/50 font-medium mb-1 tracking-wide uppercase text-xs">
                 HELLO, FRIEND
@@ -293,6 +310,9 @@ export default function Dashboard() {
             <MessageBubble key={msg.id} message={msg} memories={memories} skills={skills} />
           ))}
           {isTyping && <TypingIndicator />}
+          {streamingMsg && (
+            <MessageBubble message={streamingMsg} memories={memories} skills={skills} streaming />
+          )}
         </div>
       )}
 
@@ -323,7 +343,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Input pill — real textarea inside */}
+        {/* Input pill */}
         <div
           className="gemini-input-pill w-full px-4 pt-3.5 pb-3 mb-3 flex items-end gap-2"
           onClick={() => textareaRef.current?.focus()}
@@ -335,24 +355,25 @@ export default function Dashboard() {
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(inputValue); }
             }}
+            disabled={isTyping || streamingContent !== null}
             placeholder={`Ask ${settings.agentName}…`}
             rows={1}
-            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/35 outline-none resize-none leading-relaxed self-center"
+            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/35 outline-none resize-none leading-relaxed self-center disabled:opacity-50"
             style={{ minHeight: '24px', maxHeight: '120px' }}
           />
 
-          {/* Send button — appears when there is content */}
           {(inputValue.trim() || attachments.length > 0) && (
             <button
               onClick={() => handleSend(inputValue)}
-              className="shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 active:scale-90 transition-all"
+              disabled={isTyping || streamingContent !== null}
+              className="shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 active:scale-90 transition-all disabled:opacity-40"
             >
               <Send className="w-3.5 h-3.5 text-white" />
             </button>
           )}
         </div>
 
-        {/* Toolbar row — voice mode swaps entire row */}
+        {/* Toolbar row */}
         <AnimatePresence mode="wait" initial={false}>
           {voiceActive ? (
             <VoiceInputBar
@@ -379,7 +400,6 @@ export default function Dashboard() {
               transition={{ duration: 0.15 }}
               className="flex items-center justify-between px-1"
             >
-              {/* Left: attach + tools */}
               <div className="flex items-center gap-5">
                 <button
                   className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
@@ -395,7 +415,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* Right: model badge + mic + analyze */}
               <div className="flex items-center gap-4">
                 <button
                   onClick={e => { e.stopPropagation(); setModelOpen(true); }}
