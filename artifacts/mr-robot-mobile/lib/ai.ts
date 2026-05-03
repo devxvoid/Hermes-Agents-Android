@@ -22,6 +22,51 @@ export async function sendMessage(
   }
 }
 
+export async function pingProvider(provider: AIProvider): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (provider.type === 'openai-compatible') {
+      const res = await fetch(`${provider.baseUrl}/models`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${provider.apiKey}` },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}${text ? ': ' + text.slice(0, 120) : ''}`);
+      }
+      return { ok: true };
+    } else if (provider.type === 'anthropic') {
+      const res = await fetch(
+        `${provider.baseUrl || 'https://api.anthropic.com'}/v1/models`,
+        {
+          method: 'GET',
+          headers: {
+            'x-api-key': provider.apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+        }
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}${text ? ': ' + text.slice(0, 120) : ''}`);
+      }
+      return { ok: true };
+    } else if (provider.type === 'gemini') {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${provider.apiKey}`
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}${text ? ': ' + text.slice(0, 120) : ''}`);
+      }
+      return { ok: true };
+    }
+    return { ok: false, error: 'Unknown provider type' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Connection failed';
+    return { ok: false, error: msg };
+  }
+}
+
 function buildSystemPrompt(settings: AppSettings): string {
   const name = settings.agentName || 'Mr. Robot';
   const style = settings.responseStyle || 'balanced';
@@ -43,10 +88,11 @@ async function sendOpenAICompatibleMessage(
   settings: AppSettings,
   onChunk?: (chunk: string) => void
 ): Promise<string> {
+  const shouldStream = settings.streamingEnabled && !!onChunk;
   const body = {
     model: provider.selectedModel || 'gpt-4o-mini',
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    stream: settings.streamingEnabled && !!onChunk,
+    stream: shouldStream,
   };
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -63,7 +109,7 @@ async function sendOpenAICompatibleMessage(
     throw new Error(`API error ${response.status}: ${err}`);
   }
 
-  if (body.stream && onChunk) {
+  if (shouldStream && onChunk) {
     return readOpenAIStream(response, onChunk);
   }
 
@@ -78,12 +124,13 @@ async function sendAnthropicMessage(
   settings: AppSettings,
   onChunk?: (chunk: string) => void
 ): Promise<string> {
+  const shouldStream = settings.streamingEnabled && !!onChunk;
   const body = {
     model: provider.selectedModel || 'claude-3-5-sonnet-latest',
     max_tokens: 2048,
     system: systemPrompt,
     messages,
-    stream: settings.streamingEnabled && !!onChunk,
+    stream: shouldStream,
   };
 
   const response = await fetch(`${provider.baseUrl || 'https://api.anthropic.com'}/v1/messages`, {
@@ -101,7 +148,7 @@ async function sendAnthropicMessage(
     throw new Error(`Anthropic error ${response.status}: ${err}`);
   }
 
-  if (body.stream && onChunk) {
+  if (shouldStream && onChunk) {
     return readAnthropicStream(response, onChunk);
   }
 
@@ -171,6 +218,7 @@ async function readOpenAIStream(response: Response, onChunk: (chunk: string) => 
           onChunk(chunk);
         }
       } catch {
+        // skip malformed chunk
       }
     }
   }
@@ -203,6 +251,7 @@ async function readAnthropicStream(response: Response, onChunk: (chunk: string) 
           }
         }
       } catch {
+        // skip malformed chunk
       }
     }
   }
@@ -211,7 +260,7 @@ async function readAnthropicStream(response: Response, onChunk: (chunk: string) 
 }
 
 export const DEFAULT_MODELS: Record<string, string[]> = {
-  'openai-compatible': ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+  'openai-compatible': ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1', 'o1-mini'],
   anthropic: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
   gemini: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro', 'gemini-1.5-flash'],
 };
