@@ -125,6 +125,7 @@ function ChatContent() {
     let p = `You are Hermes AI Agent, a professional autonomous assistant. Be clear, practical, and concise.`;
     if (settings.responseStyle === 'concise') p += ' Keep responses brief.';
     if (settings.responseStyle === 'detailed') p += ' Provide detailed responses.';
+    p += `\n\nFILE CREATION: When the user asks you to create, write, or generate any file (code file, document, config, script, etc.), always include the file content using this exact format so the user gets a download button:\n\`\`\`typescript src/example.ts\n// file content here\n\`\`\`\nFor the code fence, put the language and filename together on the opening line like: \`\`\`typescript src/App.tsx\nFor non-code text files use: [FILE: filename.md]\ncontent here\n[/FILE]\nAlways use a real filename that makes sense for the content.`;
     if (usedMems.length > 0) p += '\n\nUser memory:\n' + usedMems.map(m => `- ${m.content}`).join('\n');
     if (triggeredSkills.length > 0) p += '\n\nActive skills:\n' + triggeredSkills.map(s => `- ${s.name}: ${s.instructionPrompt}`).join('\n');
     return p;

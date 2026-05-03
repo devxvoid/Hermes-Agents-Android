@@ -1,8 +1,8 @@
 import { Message, Memory, Skill } from '@/types';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { ChevronDown, ChevronUp, Brain, Zap } from 'lucide-react';
+import { ChevronDown, ChevronUp, Brain, Zap, Download, Copy, Check, FileText } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -10,6 +10,209 @@ interface MessageBubbleProps {
   skills?: Skill[];
 }
 
+/* ── File download helper ─────────────────────────────────────── */
+function downloadFile(filename: string, content: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() || 'txt';
+  const mimeMap: Record<string, string> = {
+    ts: 'text/typescript', tsx: 'text/typescript', js: 'text/javascript',
+    jsx: 'text/javascript', py: 'text/x-python', json: 'application/json',
+    html: 'text/html', css: 'text/css', md: 'text/markdown',
+    sh: 'text/x-sh', kt: 'text/plain', swift: 'text/plain',
+    java: 'text/plain', sql: 'text/plain', xml: 'text/xml',
+    yaml: 'text/yaml', yml: 'text/yaml', csv: 'text/csv',
+    txt: 'text/plain',
+  };
+  const mime = mimeMap[ext] || 'text/plain';
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* ── Content parser ───────────────────────────────────────────── */
+type Segment =
+  | { type: 'text'; content: string }
+  | { type: 'code'; lang: string; filename?: string; content: string }
+  | { type: 'file'; filename: string; content: string };
+
+function parseContent(raw: string): Segment[] {
+  const segments: Segment[] = [];
+  let remaining = raw;
+
+  // Match [FILE: name] ... [/FILE] blocks and code fences alternately
+  const BLOCK_RE = /(\[FILE:\s*([^\]]+)\]\n([\s\S]*?)\[\/FILE\]|```([a-zA-Z0-9._\-/]*)\s*([^\n]*)?\n([\s\S]*?)```)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = BLOCK_RE.exec(remaining)) !== null) {
+    const before = remaining.slice(lastIndex, match.index);
+    if (before) segments.push({ type: 'text', content: before });
+
+    if (match[1].startsWith('[FILE:')) {
+      // [FILE: filename]\ncontent\n[/FILE]
+      segments.push({ type: 'file', filename: match[2].trim(), content: match[3] });
+    } else {
+      // Code block — extract filename from lang specifier or first-line comment
+      let lang = match[4] || '';
+      const hint = match[5]?.trim() || '';
+      const codeBody = match[6] || '';
+
+      // Lang may contain a filename e.g. "typescript src/App.tsx" or "python"
+      let filename: string | undefined;
+      if (lang.includes('/') || lang.includes('.')) {
+        filename = lang;
+        lang = guessLangFromFilename(filename);
+      } else if (hint && (hint.includes('/') || hint.includes('.'))) {
+        filename = hint;
+      } else if (hint && !hint.includes(' ')) {
+        // single-word hint without extension treated as filename if looks like one
+        filename = hint || undefined;
+      }
+
+      // Also check first line for "// filename.ext" or "# filename.ext"
+      if (!filename) {
+        const firstLine = codeBody.split('\n')[0].trim();
+        const commentMatch = firstLine.match(/^(?:\/\/|#|--|\/\*)\s+([\w.\-/]+\.\w+)$/);
+        if (commentMatch) filename = commentMatch[1];
+      }
+
+      segments.push({ type: 'code', lang, filename, content: codeBody });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  const tail = remaining.slice(lastIndex);
+  if (tail) segments.push({ type: 'text', content: tail });
+
+  return segments.length > 0 ? segments : [{ type: 'text', content: raw }];
+}
+
+function guessLangFromFilename(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, string> = { ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', py: 'python', sh: 'bash', kt: 'kotlin', swift: 'swift', java: 'java', json: 'json', html: 'html', css: 'css', md: 'markdown', sql: 'sql', yaml: 'yaml', yml: 'yaml' };
+  return map[ext] || ext || 'text';
+}
+
+/* ── Code block renderer ──────────────────────────────────────── */
+function CodeBlock({ lang, filename, content }: { lang: string; filename?: string; content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = useCallback(async () => {
+    await navigator.clipboard.writeText(content.trim());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }, [content]);
+
+  const displayLang = filename || lang || 'code';
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-border/60 text-[12.5px] my-1.5">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2 bg-muted/60 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-400/70" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400/70" />
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400/70" />
+          </div>
+          <span className="text-[11px] text-muted-foreground font-mono font-medium">{displayLang}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {filename && (
+            <button
+              onClick={() => downloadFile(filename, content.trim())}
+              title={`Download ${filename}`}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-primary transition-colors px-1.5 py-0.5 rounded hover:bg-primary/10"
+            >
+              <Download className="w-3 h-3" />
+              <span>Save</span>
+            </button>
+          )}
+          <button
+            onClick={copy}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-foreground/10"
+          >
+            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+      {/* Code */}
+      <pre className="overflow-x-auto p-3.5 bg-muted/30">
+        <code className="font-mono text-[12.5px] leading-relaxed text-foreground/90 whitespace-pre break-normal">
+          {content.trim()}
+        </code>
+      </pre>
+    </div>
+  );
+}
+
+/* ── File block renderer ──────────────────────────────────────── */
+function FileBlock({ filename, content }: { filename: string; content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-green-500/25 bg-green-500/8 my-1.5">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-green-500/10 border-b border-green-500/20">
+        <div className="flex items-center gap-2">
+          <FileText className="w-3.5 h-3.5 text-green-400" />
+          <span className="text-[12px] text-green-400 font-medium font-mono">{filename}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(content.trim());
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors px-1.5 py-0.5 rounded"
+          >
+            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={() => downloadFile(filename, content.trim())}
+            className="flex items-center gap-1 text-[11px] bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors px-2.5 py-1 rounded-lg font-semibold"
+          >
+            <Download className="w-3 h-3" />
+            Download
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-x-auto p-3.5 max-h-48">
+        <code className="font-mono text-[12px] leading-relaxed text-foreground/80 whitespace-pre break-normal">
+          {content.trim()}
+        </code>
+      </pre>
+    </div>
+  );
+}
+
+/* ── Rendered message content ─────────────────────────────────── */
+function MessageContent({ content }: { content: string }) {
+  const segments = parseContent(content);
+
+  return (
+    <div>
+      {segments.map((seg, i) => {
+        if (seg.type === 'code') {
+          return <CodeBlock key={i} lang={seg.lang} filename={seg.filename} content={seg.content} />;
+        }
+        if (seg.type === 'file') {
+          return <FileBlock key={i} filename={seg.filename} content={seg.content} />;
+        }
+        // Text — render with line breaks preserved
+        return (
+          <span key={i} className="whitespace-pre-wrap break-words">
+            {seg.content}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Main MessageBubble ───────────────────────────────────────── */
 export function MessageBubble({ message, memories = [], skills = [] }: MessageBubbleProps) {
   const [metaOpen, setMetaOpen] = useState(false);
   const isUser = message.role === 'user';
@@ -29,18 +232,21 @@ export function MessageBubble({ message, memories = [], skills = [] }: MessageBu
         </div>
       )}
 
-      <div className={cn('flex flex-col gap-1 max-w-[82%] md:max-w-[68%]', isUser && 'items-end')}>
+      <div className={cn('flex flex-col gap-1 max-w-[86%] md:max-w-[72%]', isUser && 'items-end')}>
         {/* Bubble */}
         <div className={cn(
-          'px-4 py-3 rounded-2xl text-[13.5px] leading-relaxed whitespace-pre-wrap break-words',
+          'px-4 py-3 rounded-2xl text-[13.5px] leading-relaxed',
           isUser
             ? 'bg-primary text-primary-foreground rounded-br-[6px] shadow-sm'
             : 'glass-bubble-ai text-foreground rounded-bl-[6px]'
         )}>
-          {message.content}
+          {isUser
+            ? <span className="whitespace-pre-wrap break-words">{message.content}</span>
+            : <MessageContent content={message.content} />
+          }
         </div>
 
-        {/* Context chips (memories/skills used) */}
+        {/* Context chips */}
         {!isUser && (usedMems.length > 0 || usedSkills.length > 0) && (
           <div className="flex flex-wrap gap-1 px-1">
             {usedMems.map(m => (
@@ -72,7 +278,7 @@ export function MessageBubble({ message, memories = [], skills = [] }: MessageBu
           )}
         </div>
 
-        {/* Expanded metadata card */}
+        {/* Expanded metadata */}
         {!isUser && hasMeta && metaOpen && (
           <div className="glass-card rounded-xl p-3 text-xs space-y-1.5 w-full max-w-[260px]">
             {message.metadata && (

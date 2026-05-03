@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { AIProviderConfig } from '@/types';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -14,8 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { testProviderConnection, fetchProviderModels } from '@/lib/ai/aiClient';
 import { testLocalRuntimeConnection, fetchLocalModels } from '@/lib/ai/localRuntimeClient';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, RefreshCw, Loader2, Plus, Cpu, CheckCircle, XCircle, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw, Loader2, Plus, Cpu, CheckCircle, XCircle, AlertCircle, Wifi, WifiOff, FolderOpen, FileArchive, Download, Copy, Check, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 const ONLINE_PROVIDERS = [
   { name: 'OpenAI', type: 'openai-compatible' as const, baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'], description: 'GPT-4o, GPT-4 and GPT-3.5 models' },
@@ -418,28 +425,8 @@ function AIModelsContent() {
           </div>
         </TabsContent>
 
-        <TabsContent value="downloaded" className="mt-4 space-y-4">
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-400">
-            Downloading a model file stores it on your device. To run it offline, you also need a compatible local AI runtime such as Ollama, LM Studio, GPT4All, llama.cpp, vLLM, or MLC LLM.
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            {LOCAL_MODEL_CATALOG.map(m => (
-              <div key={m.modelId} className="glass-card rounded-xl p-4 space-y-2" data-testid={`model-catalog-${m.modelId}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-medium text-sm text-foreground">{m.name}</div>
-                    <div className="text-xs text-muted-foreground">{m.family} · {m.paramSize} · {m.format}</div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">{m.estSize}</Badge>
-                </div>
-                <div className="text-xs text-muted-foreground">Min RAM: {m.minRam}</div>
-                <div className="flex flex-wrap gap-1">
-                  {m.runtimes.map(r => <span key={r} className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{r}</span>)}
-                </div>
-                <div className="text-xs font-mono text-muted-foreground">{m.modelId}</div>
-              </div>
-            ))}
-          </div>
+        <TabsContent value="downloaded" className="mt-4">
+          <DownloadedModelsTab />
         </TabsContent>
 
         <TabsContent value="custom" className="mt-4">
@@ -450,6 +437,224 @@ function AIModelsContent() {
           <AdvancedSettings />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function DownloadedModelsTab() {
+  const { addProvider, providers, updateSettings, settings } = useApp();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedFile, setSelectedFile] = useState<{ name: string; size: number } | null>(null);
+  const [importRuntime, setImportRuntime] = useState('Ollama');
+  const [importModelName, setImportModelName] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const importedProviders = providers.filter(p => p.mode === 'local' && p.name.startsWith('[Imported]'));
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile({ name: file.name, size: file.size });
+    const baseName = file.name.replace(/\.(gguf|bin|safetensors)$/i, '');
+    setImportModelName(baseName.toLowerCase().replace(/\s+/g, '-'));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const registerModel = () => {
+    if (!importModelName.trim()) { toast({ title: 'Enter a model name', variant: 'destructive' }); return; }
+    const rt = LOCAL_RUNTIMES.find(r => r.name === importRuntime);
+    const provider: AIProviderConfig = {
+      id: crypto.randomUUID(),
+      name: `[Imported] ${importModelName.trim()}`,
+      type: 'local-openai-compatible',
+      mode: 'local',
+      apiKey: '',
+      baseUrl: rt?.endpoint || 'http://localhost:11434',
+      selectedModel: importModelName.trim(),
+      customModels: [],
+      enabled: true,
+      supportsStreaming: false,
+      supportsSystemPrompt: true,
+      status: 'not_configured',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    addProvider(provider);
+    toast({
+      title: 'Model registered!',
+      description: `"${importModelName}" saved for ${importRuntime}. Go to Local AI tab to test the connection.`,
+    });
+    setSelectedFile(null);
+    setImportModelName('');
+  };
+
+  const copyCommand = async (modelId: string, cmd: string) => {
+    await navigator.clipboard.writeText(cmd);
+    setCopiedId(modelId);
+    setTimeout(() => setCopiedId(null), 2000);
+    toast({ title: 'Copied!', description: cmd });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Info banner */}
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-sm text-blue-400 leading-relaxed">
+        Import a GGUF / safetensors model from your device storage, or copy an Ollama pull command to download a model. A local runtime (Ollama, llama.cpp, LM Studio) must be running to use any local model.
+      </div>
+
+      {/* ── Section: Import from device ── */}
+      <div className="space-y-3">
+        <p className="settings-section-header" style={{ marginTop: 0 }}>Import from Device Storage</p>
+
+        <input ref={fileInputRef} type="file" accept=".gguf,.bin,.safetensors" onChange={handleFileSelect} className="hidden" />
+
+        {!selectedFile ? (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full border-2 border-dashed border-border hover:border-primary/40 rounded-2xl p-8 text-center transition-all group"
+            data-testid="btn-browse-model-file"
+          >
+            <FolderOpen className="w-9 h-9 text-muted-foreground/30 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
+            <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">Browse for model file</p>
+            <p className="text-xs text-muted-foreground/40 mt-1">.gguf · .bin · .safetensors</p>
+          </button>
+        ) : (
+          <div className="glass-card rounded-2xl p-4 space-y-3">
+            {/* File info chip */}
+            <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+              <FileArchive className="w-5 h-5 text-green-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-green-400 truncate">{selectedFile.name}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
+              </div>
+              <button onClick={() => setSelectedFile(null)} className="text-muted-foreground hover:text-destructive transition-colors">
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Model Name / ID</Label>
+                <Input
+                  value={importModelName}
+                  onChange={e => setImportModelName(e.target.value)}
+                  placeholder="e.g. llama3.2:3b"
+                  className="font-mono text-xs"
+                  data-testid="input-import-model-name"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Run With</Label>
+                <Select value={importRuntime} onValueChange={setImportRuntime}>
+                  <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LOCAL_RUNTIMES.filter(r => r.name !== 'Custom').map(r => (
+                      <SelectItem key={r.name} value={r.name} className="text-xs">{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="bg-muted/40 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
+              After registering, start {importRuntime} and load the model file, then use the <strong>Local AI</strong> tab to test the connection.
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                Change File
+              </Button>
+              <Button size="sm" onClick={registerModel} disabled={!importModelName.trim()} className="flex-1 glow-primary" data-testid="btn-register-model">
+                Register Model
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Section: Registered imported models ── */}
+      {importedProviders.length > 0 && (
+        <div className="space-y-2">
+          <p className="settings-section-header" style={{ marginTop: 0 }}>Registered Local Models</p>
+          {importedProviders.map(p => (
+            <div key={p.id} className="glass-card rounded-xl p-3 flex items-center gap-3">
+              <FileArchive className="w-5 h-5 text-cyan-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{p.name.replace('[Imported] ', '')}</p>
+                <p className="text-xs text-muted-foreground font-mono truncate">{p.selectedModel} · {p.baseUrl}</p>
+              </div>
+              <StatusBadge status={p.status} />
+              {p.status === 'connected' && (
+                <button
+                  onClick={() => { updateSettings({ activeProviderId: p.id }); toast({ title: 'Active model set!' }); }}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-all shrink-0',
+                    settings.activeProviderId === p.id
+                      ? 'text-primary border-primary/40 bg-primary/10'
+                      : 'text-muted-foreground border-border hover:border-primary/30'
+                  )}
+                >
+                  {settings.activeProviderId === p.id ? 'Active' : 'Set Active'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Section: Ollama pull catalog ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="settings-section-header" style={{ marginTop: 0 }}>Download via Ollama</p>
+          <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer"
+             className="text-xs text-primary/60 hover:text-primary transition-colors">ollama.ai ↗</a>
+        </div>
+
+        <div className="bg-muted/30 border border-border rounded-xl p-3 flex items-start gap-2 text-xs text-muted-foreground">
+          <Terminal className="w-4 h-4 shrink-0 mt-0.5 text-primary/60" />
+          <span>Copy the pull command and run it in your terminal. Then configure the Ollama runtime in the <strong>Local AI</strong> tab.</span>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-3">
+          {LOCAL_MODEL_CATALOG.map(m => (
+            <div key={m.modelId} className="glass-card rounded-xl p-4 space-y-2.5 relative overflow-hidden" data-testid={`model-catalog-${m.modelId}`}>
+              {/* Size badge */}
+              <div className="absolute top-3 right-3">
+                <span className="text-xs font-mono bg-foreground/8 border border-border rounded-lg px-2 py-0.5 text-muted-foreground">{m.estSize}</span>
+              </div>
+
+              <div>
+                <p className="font-semibold text-sm text-foreground pr-12">{m.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{m.family} · {m.paramSize} · {m.format} · Min RAM: {m.minRam}</p>
+              </div>
+
+              {/* Compatible runtimes */}
+              <div className="flex flex-wrap gap-1">
+                {m.runtimes.map(r => (
+                  <span key={r} className="text-[11px] bg-primary/8 border border-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">{r}</span>
+                ))}
+              </div>
+
+              {/* Command + copy */}
+              <div className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
+                <code className="flex-1 text-[11px] font-mono text-muted-foreground truncate">ollama pull {m.modelId}</code>
+                <button
+                  onClick={() => copyCommand(m.modelId, `ollama pull ${m.modelId}`)}
+                  data-testid={`btn-copy-ollama-${m.modelId}`}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors shrink-0"
+                  title="Copy command"
+                >
+                  {copiedId === m.modelId
+                    ? <Check className="w-3.5 h-3.5 text-green-400" />
+                    : <Copy className="w-3.5 h-3.5" />
+                  }
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
