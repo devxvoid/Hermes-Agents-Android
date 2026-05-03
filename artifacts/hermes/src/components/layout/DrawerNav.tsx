@@ -83,7 +83,10 @@ export function DrawerNav({ open, onClose }: DrawerNavProps) {
 
             {/* ── New chat ── */}
             <button
-              onClick={() => go('/chat')}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('mr-robot-new-chat'));
+                go('/');
+              }}
               className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.06] active:bg-white/[0.09] transition-colors"
             >
               <SquarePen className="w-[18px] h-[18px] text-white/70" strokeWidth={1.8} />

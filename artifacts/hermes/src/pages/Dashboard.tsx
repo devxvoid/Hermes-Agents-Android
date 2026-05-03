@@ -53,6 +53,19 @@ export default function Dashboard() {
     if (pre) { sessionStorage.removeItem('chat_prefill'); setInputValue(pre); }
   }, []);
 
+  /* ── Listen for "New chat" signal from drawer ── */
+  useEffect(() => {
+    const reset = () => {
+      setConvId(null);
+      setInputValue('');
+      setAttachments([]);
+      setIsTyping(false);
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    };
+    window.addEventListener('mr-robot-new-chat', reset);
+    return () => window.removeEventListener('mr-robot-new-chat', reset);
+  }, []);
+
   /* ── Auto-scroll ── */
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
