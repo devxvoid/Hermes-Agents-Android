@@ -12,15 +12,6 @@ import { MessageSquare, Brain, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-const STARTER_PROMPTS = [
-  'Summarize my current project plan.',
-  'Use my memory and help me plan today.',
-  'Which skills can help me build an Android app?',
-  'Create a launch checklist for my product.',
-  'Analyze my saved notes and suggest next actions.',
-  'Configure a local AI model for offline use.',
-];
-
 function ConversationNotFound() {
   const [, setLocation] = useLocation();
   return (
@@ -122,7 +113,7 @@ function ChatContent() {
   }, [activeConvId, conversations, memories, skills, settings, providers, addConversation, updateConversation, setActiveConversationId, setLocation, scrollToBottom, toast]);
 
   function buildSystemPrompt(usedMems: typeof memories, triggeredSkills: typeof skills) {
-    let p = `You are Hermes AI Agent, a professional autonomous assistant. Be clear, practical, and concise.`;
+    let p = `You are ${settings.agentName}, a professional autonomous AI assistant. Be clear, practical, and concise.`;
     if (settings.responseStyle === 'concise') p += ' Keep responses brief.';
     if (settings.responseStyle === 'detailed') p += ' Provide detailed responses.';
     p += `\n\nFILE CREATION: When the user asks you to create, write, or generate any file (code file, document, config, script, etc.), always include the file content using this exact format so the user gets a download button:\n\`\`\`typescript src/example.ts\n// file content here\n\`\`\`\nFor the code fence, put the language and filename together on the opening line like: \`\`\`typescript src/App.tsx\nFor non-code text files use: [FILE: filename.md]\ncontent here\n[/FILE]\nAlways use a real filename that makes sense for the content.`;
@@ -143,7 +134,7 @@ function ChatContent() {
       <div className="glass-bar border-t-0 border-b border-border/50 px-4 py-2.5 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-6 h-6 rounded-[8px] bg-gradient-to-br from-primary/80 to-accent/70 flex items-center justify-center shrink-0">
-            <span className="text-white text-[10px] font-black select-none">H</span>
+            <span className="text-white text-[10px] font-black select-none">R</span>
           </div>
           <h1 className="text-sm font-semibold truncate text-foreground">{activeConv?.title || 'New Chat'}</h1>
         </div>
@@ -175,43 +166,15 @@ function ChatContent() {
         className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-4"
         data-testid="chat-messages"
         style={{
-          /* mobile: input bar (~80px) + pill nav + gap (20+64+12=96) = ~176px total; desktop: just input bar */
-          paddingBottom: 'calc(80px + 96px + env(safe-area-inset-bottom))',
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom))',
         }}
       >
-        {messages.length === 0 && !isTyping && (
-          <div className="flex flex-col items-center justify-center min-h-full gap-6 py-8">
-            <div className="w-16 h-16 rounded-2xl glass-strong relative overflow-hidden glass-shine flex items-center justify-center">
-              <span className="text-primary font-bold text-2xl relative z-10">H</span>
-            </div>
-            <div className="text-center">
-              <h2 className="text-lg font-semibold">How can I help you today?</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {activeProvider ? `Connected to ${activeProvider.name}` : 'Demo Mode — configure an AI model for real responses'}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl px-2">
-              {STARTER_PROMPTS.map(prompt => (
-                <button key={prompt} onClick={() => handleSend(prompt)}
-                  className="text-left text-sm glass-card rounded-2xl px-4 py-3 text-muted-foreground hover:text-foreground transition-all">
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         {messages.map(msg => <MessageBubble key={msg.id} message={msg} memories={memories} skills={skills} />)}
         {isTyping && <TypingIndicator />}
       </div>
 
-      {/*
-        ── Input bar ──
-        Mobile: fixed at bottom-[96px] so it floats ABOVE the pill nav
-                (pill nav is at bottom-5=20px, ~64px tall → top of nav = 84px from bottom)
-                input sits at 96px from bottom, so there's ~12px gap between input and nav
-        Desktop: fixed at bottom-0, left-60 (sidebar width)
-      */}
-      <div className="fixed bottom-[96px] left-0 right-0 z-40 md:bottom-0 md:left-60">
+      {/* ── Input bar ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:left-60">
         <ChatInput onSend={handleSend} onNewChat={createNewConversation} disabled={isTyping} />
       </div>
     </div>
