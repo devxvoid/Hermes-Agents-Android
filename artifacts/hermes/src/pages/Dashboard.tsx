@@ -45,7 +45,7 @@ export default function Dashboard() {
         <div className="relative flex items-center gap-4 mb-4">
           {/* App icon — squircle */}
           <div className="app-icon">
-            <span className="text-white font-extrabold text-2xl tracking-tight select-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>H</span>
+            <span className="text-white font-extrabold text-2xl tracking-tight select-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>R</span>
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground leading-none">

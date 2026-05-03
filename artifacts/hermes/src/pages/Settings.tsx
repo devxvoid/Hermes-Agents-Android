@@ -121,7 +121,6 @@ export default function Settings() {
     const result = await Notification.requestPermission();
     setNotifPerm(result as PermStatus);
     if (result === 'granted') {
-      new Notification('Mr. Robot', { body: 'Notifications are enabled.' });
       toast({ title: 'Notifications enabled' });
     } else {
       toast({ title: 'Permission denied', description: 'Enable in browser/device settings.', variant: 'destructive' });
