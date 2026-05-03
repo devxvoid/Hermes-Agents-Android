@@ -13,6 +13,7 @@ export interface AppSettings {
   amoledBlack: boolean;
   systemFont: boolean;
   streamingEnabled: boolean;
+  hackerMode: boolean;
   activeProviderId?: string;
   activeModelId?: string;
   profileImage?: string;

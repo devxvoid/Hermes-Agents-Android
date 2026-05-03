@@ -13,12 +13,20 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/* ── Suggestion chips shown when conversation is empty ── */
-const SUGGESTIONS = [
-  { emoji: '💬', label: 'Start a new chat'      },
-  { emoji: '🧠', label: 'Search my memories'    },
-  { emoji: '📝', label: 'Write anything'         },
-  { emoji: '✨', label: 'Boost my day'            },
+/* ── Suggestion chips — normal mode ── */
+const SUGGESTIONS_NORMAL = [
+  { emoji: '🎯', label: 'Hack a problem'       },
+  { emoji: '🔬', label: 'Analyze the data'     },
+  { emoji: '💻', label: 'Write me some code'   },
+  { emoji: '🌐', label: 'Research the web'     },
+];
+
+/* ── Suggestion chips — hacker terminal mode ── */
+const SUGGESTIONS_HACKER = [
+  { emoji: '>', label: 'sudo infiltrate --target' },
+  { emoji: '>', label: 'run exploit.sh'           },
+  { emoji: '>', label: 'decrypt -f ciphertext'    },
+  { emoji: '>', label: 'nmap -sS 0.0.0.0/0'       },
 ];
 
 interface AttachedFile { name: string; content: string; type: string; }
@@ -219,23 +227,44 @@ export default function Dashboard() {
       {/* ══════ Greeting (empty state) ══════ */}
       {isEmpty ? (
         <div className="flex-1 px-6 pt-10 md:pt-16" style={{ paddingBottom: BOTTOM_BAR_H + 16 }}>
-          <div className="mb-10">
-            <p className="text-base text-foreground/55 font-medium mb-1">
-              Hi {settings.agentName}
-            </p>
-            <h1 className="text-[32px] md:text-[40px] font-bold text-foreground leading-tight tracking-tight">
-              Where should we start?
-            </h1>
-          </div>
+          {settings.hackerMode ? (
+            /* ── Hacker terminal home ── */
+            <div className="mb-10">
+              <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3"
+                style={{ color: 'rgba(0,255,65,0.55)' }}>
+                // ACCESS_GRANTED · FSOCIETY_OS v2.0
+              </p>
+              <h1 className="text-[28px] md:text-[36px] font-bold leading-tight tracking-tight"
+                style={{ color: '#00FF41' }}>
+                HELLO, FRIEND_
+              </h1>
+              <p className="text-sm mt-2" style={{ color: 'rgba(0,255,65,0.50)' }}>
+                root@mrrobot:~# awaiting command...
+              </p>
+            </div>
+          ) : (
+            /* ── Normal home ── */
+            <div className="mb-10">
+              <p className="text-base text-foreground/50 font-medium mb-1 tracking-wide uppercase text-xs">
+                HELLO, FRIEND
+              </p>
+              <h1 className="text-[32px] md:text-[40px] font-bold text-foreground leading-tight tracking-tight">
+                What are we<br />breaking today?
+              </h1>
+            </div>
+          )}
 
           <div className="flex flex-col gap-3 max-w-sm">
-            {SUGGESTIONS.map(({ emoji, label }) => (
+            {(settings.hackerMode ? SUGGESTIONS_HACKER : SUGGESTIONS_NORMAL).map(({ emoji, label }) => (
               <button
                 key={label}
                 onClick={() => { setInputValue(label); setTimeout(() => textareaRef.current?.focus(), 50); }}
                 className="gemini-chip flex items-center gap-3 px-5 py-3.5 rounded-full text-left w-fit"
               >
-                <span className="text-xl leading-none select-none">{emoji}</span>
+                <span className={cn(
+                  'leading-none select-none shrink-0',
+                  settings.hackerMode ? 'text-sm font-bold' : 'text-xl'
+                )}>{emoji}</span>
                 <span className="text-[15px] font-medium text-foreground/90">{label}</span>
               </button>
             ))}

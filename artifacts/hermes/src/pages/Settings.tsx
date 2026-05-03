@@ -13,7 +13,7 @@ import { useLocation } from 'wouter';
 import {
   Download, Upload, Trash2, Key, RotateCcw, Shield, Moon, Sun, Monitor, Check,
   Cpu, Bell, Mic, HardDrive, ChevronRight, Bot, Zap, Palette, Database, Info,
-  AlertTriangle, BrainCircuit, Settings2
+  AlertTriangle, BrainCircuit, Settings2, Terminal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -329,6 +329,46 @@ export default function Settings() {
             </div>
           </div>
           <Switch checked={settings.systemFont} onCheckedChange={v => updateSettings({ systemFont: v })} data-testid="toggle-system-font" />
+        </div>
+
+        {/* ── Hacker Mode ── */}
+        <div
+          className={cn(
+            'px-4 py-3.5 flex items-center justify-between gap-4 transition-colors duration-300',
+            settings.hackerMode && 'bg-[rgba(0,255,65,0.04)]'
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300',
+              settings.hackerMode
+                ? 'bg-[rgba(0,255,65,0.15)] text-[#00FF41] shadow-[0_0_12px_rgba(0,255,65,0.4)]'
+                : 'bg-emerald-900/30 text-emerald-400'
+            )}>
+              <Terminal className="w-4 h-4" />
+            </div>
+            <div>
+              <p className={cn(
+                'text-sm font-semibold transition-colors duration-300',
+                settings.hackerMode && 'text-[#00FF41]'
+              )}>
+                {settings.hackerMode ? 'HACKER MODE: ON' : 'Hacker Mode'}
+              </p>
+              <p className={cn(
+                'text-xs mt-0.5 leading-snug transition-colors duration-300',
+                settings.hackerMode ? 'text-[rgba(0,255,65,0.55)]' : 'text-muted-foreground'
+              )}>
+                {settings.hackerMode
+                  ? '// root@fsociety — terminal theme active'
+                  : 'Transform into a hacking terminal'}
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={settings.hackerMode}
+            onCheckedChange={v => updateSettings({ hackerMode: v })}
+            data-testid="toggle-hacker-mode"
+          />
         </div>
       </SectionCard>
 

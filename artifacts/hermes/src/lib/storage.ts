@@ -98,6 +98,7 @@ export function normalizeSettings(raw: Partial<AppSettings>): AppSettings {
     amoledBlack: raw.amoledBlack !== undefined ? Boolean(raw.amoledBlack) : false,
     systemFont: raw.systemFont !== undefined ? Boolean(raw.systemFont) : false,
     streamingEnabled: raw.streamingEnabled !== undefined ? Boolean(raw.streamingEnabled) : true,
+    hackerMode: raw.hackerMode !== undefined ? Boolean(raw.hackerMode) : false,
     activeProviderId: raw.activeProviderId,
     activeModelId: raw.activeModelId,
     profileImage: raw.profileImage,
