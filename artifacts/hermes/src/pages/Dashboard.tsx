@@ -358,12 +358,15 @@ export default function Dashboard() {
             <VoiceInputBar
               key="voice"
               onAttach={() => { setVoiceActive(false); setAttachOpen(true); }}
+              onTranscriptChange={text => setInputValue(text)}
               onStop={text => {
                 setVoiceActive(false);
-                if (text) { setInputValue(text); setTimeout(() => textareaRef.current?.focus(), 80); }
+                if (text) setInputValue(text);
+                setTimeout(() => textareaRef.current?.focus(), 80);
               }}
               onSend={text => {
                 setVoiceActive(false);
+                setInputValue('');
                 if (text) handleSend(text);
               }}
             />
