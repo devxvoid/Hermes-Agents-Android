@@ -1,5 +1,6 @@
 import { useState, useRef, KeyboardEvent, useCallback } from 'react';
 import { Send, Plus, Mic, MicOff, Paperclip, X } from 'lucide-react';
+import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
 import { cn } from '@/lib/utils';
 
 interface AttachedFile {
@@ -15,12 +16,12 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message Hermes...' }: ChatInputProps) {
+export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message...' }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const handleSend = () => {
@@ -30,7 +31,9 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
     let messageText = trimmed;
     if (attachments.length > 0) {
       const fileSection = attachments.map(f =>
-        `[Attached file: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``
+        f.type.startsWith('image/')
+          ? `[Image: ${f.name}]\n<img src="${f.content}" alt="${f.name}" />`
+          : `[Attached file: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``
       ).join('\n\n');
       messageText = trimmed ? `${trimmed}\n\n${fileSection}` : fileSection;
     }
@@ -45,7 +48,7 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleInput = () => {
+  const autoResize = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
@@ -55,62 +58,51 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
   /* ── Voice input ── */
   const startVoiceInput = useCallback(() => {
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) {
-      alert('Voice input is not supported in this browser. Try Chrome or Edge.');
-      return;
-    }
+    if (!SpeechRec) { alert('Voice input not supported in this browser.'); return; }
 
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
+    if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); return; }
 
     const rec = new SpeechRec();
     rec.continuous = false;
     rec.interimResults = false;
     rec.lang = 'en-US';
-
     rec.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript;
-      setValue(prev => prev ? prev + ' ' + transcript : transcript);
-      setTimeout(handleInput, 50);
+      const t = e.results[0][0].transcript;
+      setValue(prev => prev ? prev + ' ' + t : t);
+      setTimeout(autoResize, 50);
     };
     rec.onerror = () => setIsRecording(false);
-    rec.onend = () => setIsRecording(false);
-
+    rec.onend   = () => setIsRecording(false);
     rec.start();
     setIsRecording(true);
     recognitionRef.current = rec;
   }, [isRecording]);
 
-  /* ── File attachment ── */
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const newAttachments: AttachedFile[] = [];
-
-    for (const file of files.slice(0, 5)) {
-      try {
-        const content = await readFileAsText(file);
-        newAttachments.push({ name: file.name, content, type: file.type });
-      } catch {
-        newAttachments.push({ name: file.name, content: `[Binary file — ${formatBytes(file.size)}]`, type: file.type });
+  /* ── File handling (from AttachmentMenu or direct) ── */
+  const processFile = useCallback(async (file: File) => {
+    try {
+      let content: string;
+      if (file.type.startsWith('image/')) {
+        content = await readFileAsDataURL(file);
+      } else {
+        content = await readFileAsText(file);
       }
+      setAttachments(prev => [...prev, { name: file.name, content, type: file.type }].slice(0, 5));
+    } catch {
+      setAttachments(prev => [
+        ...prev,
+        { name: file.name, content: `[Binary file — ${formatBytes(file.size)}]`, type: file.type },
+      ].slice(0, 5));
     }
+  }, []);
 
-    setAttachments(prev => [...prev, ...newAttachments].slice(0, 5));
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
+  const removeAttachment = (i: number) => setAttachments(prev => prev.filter((_, idx) => idx !== i));
 
   const canSend = (value.trim() || attachments.length > 0) && !disabled;
 
   return (
     <div
-      className="glass-bar px-3 pt-2 pb-3"
+      className="glass-bar px-3 pt-2 pb-3 relative"
       style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
     >
       {/* Attachment chips */}
@@ -121,7 +113,11 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
               key={i}
               className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 text-xs font-medium text-primary"
             >
-              <Paperclip className="w-3 h-3 shrink-0" />
+              {file.type.startsWith('image/') ? (
+                <img src={file.content} alt={file.name} className="w-5 h-5 rounded object-cover" />
+              ) : (
+                <Paperclip className="w-3 h-3 shrink-0" />
+              )}
               <span className="max-w-[120px] truncate">{file.name}</span>
               <button onClick={() => removeAttachment(i)} className="text-primary/60 hover:text-primary ml-0.5">
                 <X className="w-3 h-3" />
@@ -132,17 +128,17 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
       )}
 
       <div className="max-w-3xl mx-auto flex items-end gap-2">
-        {/* New chat */}
+        {/* + button → attachment menu */}
         <button
-          onClick={onNewChat}
-          data-testid="btn-new-chat"
-          title="New chat"
+          onClick={() => setAttachMenuOpen(v => !v)}
+          data-testid="btn-attach-plus"
+          title="Attach"
           className="shrink-0 w-10 h-10 rounded-full glass-card flex items-center justify-center hover:border-primary/30 transition-all"
         >
           <Plus className="w-4 h-4 text-muted-foreground" />
         </button>
 
-        {/* Main input bar */}
+        {/* Main input */}
         <div className={cn(
           'flex-1 flex items-end gap-1 rounded-2xl px-3 py-2.5 glass-input',
           disabled && 'opacity-60'
@@ -150,9 +146,9 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={e => { setValue(e.target.value); handleInput(); }}
+            onChange={e => { setValue(e.target.value); autoResize(); }}
             onKeyDown={handleKeyDown}
-            placeholder={isRecording ? 'Listening...' : placeholder}
+            placeholder={isRecording ? 'Listening…' : placeholder}
             disabled={disabled}
             rows={1}
             data-testid="input-chat-message"
@@ -160,20 +156,10 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
             style={{ minHeight: '24px' }}
           />
 
-          {/* File attach */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach file"
-            data-testid="btn-attach-file"
-            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all text-muted-foreground/60 hover:text-primary hover:bg-primary/10"
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-          </button>
-
           {/* Mic */}
           <button
             onClick={startVoiceInput}
-            title={isRecording ? 'Stop recording' : 'Voice input'}
+            title={isRecording ? 'Stop' : 'Voice input'}
             data-testid="btn-voice-input"
             className={cn(
               'shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all',
@@ -202,36 +188,42 @@ export function ChatInput({ onSend, onNewChat, disabled, placeholder = 'Message 
         </div>
       </div>
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept=".txt,.md,.ts,.tsx,.js,.jsx,.py,.json,.yaml,.yml,.csv,.html,.css,.sh,.swift,.kt,.java,.c,.cpp,.h,.sql,.xml,.env,.toml,.ini,.conf"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-
-      {!isRecording && (
+      {isRecording ? (
+        <p className="text-[10px] text-red-400/70 mt-1.5 text-center animate-pulse">
+          Recording… tap mic to stop
+        </p>
+      ) : (
         <p className="text-[10px] text-muted-foreground/35 mt-1.5 text-center">
           Enter to send · Shift+Enter for newline
         </p>
       )}
-      {isRecording && (
-        <p className="text-[10px] text-red-400/70 mt-1.5 text-center animate-pulse">
-          Recording... tap mic again to stop
-        </p>
-      )}
+
+      {/* Attachment popup (anchored above this bar) */}
+      <AttachmentMenu
+        open={attachMenuOpen}
+        onClose={() => setAttachMenuOpen(false)}
+        onFile={processFile}
+        bottomOffset={82}
+      />
     </div>
   );
 }
 
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target?.result as string);
-    reader.onerror = reject;
-    reader.readAsText(file);
+    const r = new FileReader();
+    r.onload = e => resolve(e.target?.result as string);
+    r.onerror = reject;
+    r.readAsText(file);
+  });
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target?.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
   });
 }
 

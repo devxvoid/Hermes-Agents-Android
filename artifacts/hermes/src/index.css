@@ -555,4 +555,14 @@
   .mobile-nav-hidden {
     display: none !important;
   }
+
+  /* Gemini attachment popup (+ button menu) */
+  .attachment-popup {
+    background: #2c2c2e;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow:
+      0 8px 32px rgba(0,0,0,0.55),
+      0 2px 8px  rgba(0,0,0,0.30),
+      inset 0 1px 0 rgba(255,255,255,0.04);
+  }
 }

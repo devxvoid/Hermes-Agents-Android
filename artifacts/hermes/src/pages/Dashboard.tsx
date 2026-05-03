@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useLocation } from 'wouter';
 import { Mic, BarChart2, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
 import { cn } from '@/lib/utils';
 
 /* ── Quick-action suggestion chips ── */
@@ -14,6 +16,7 @@ const SUGGESTIONS = [
 export default function Dashboard() {
   const { settings } = useApp();
   const [, setLocation] = useLocation();
+  const [attachOpen, setAttachOpen] = useState(false);
 
   const startChat = (prefill?: string) => {
     if (prefill) {
@@ -70,7 +73,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-5">
             <button
               className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
-              onClick={e => { e.stopPropagation(); startChat(); }}
+              onClick={e => { e.stopPropagation(); setAttachOpen(v => !v); }}
             >
               <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
             </button>
@@ -97,6 +100,14 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Attachment popup */}
+      <AttachmentMenu
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onFile={() => startChat()}
+        bottomOffset={128}
+      />
     </div>
   );
 }
