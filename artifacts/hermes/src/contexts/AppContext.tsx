@@ -125,11 +125,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!initialized) return;
     const root = document.documentElement;
-    const { theme, themeColor, amoledBlack, systemFont } = settings;
+    const { theme, themeColor, amoledBlack, systemFont, hackerMode } = settings;
 
     /* 1. Dark / light / system */
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark) || !!hackerMode;
     root.classList.toggle('dark', isDark);
 
     /* 2. Theme colour — inline style wins over any stylesheet rule */
@@ -139,8 +139,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.classList.toggle('amoled', !!amoledBlack);
 
     /* 4. System font override */
-    root.classList.toggle('system-font', !!systemFont);
-  }, [settings.theme, settings.themeColor, settings.amoledBlack, settings.systemFont, initialized]);
+    root.classList.toggle('system-font', !!systemFont && !hackerMode);
+
+    /* 5. Hacker terminal theme */
+    root.classList.toggle('hacker', !!hackerMode);
+  }, [settings.theme, settings.themeColor, settings.amoledBlack, settings.systemFont, settings.hackerMode, initialized]);
 
   const addConversation = useCallback((conv: Conversation) => {
     setConversations(prev => {

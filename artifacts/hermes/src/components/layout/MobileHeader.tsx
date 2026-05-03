@@ -61,9 +61,17 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
             <Menu className="w-[22px] h-[22px] text-foreground/80" strokeWidth={1.8} />
           </button>
 
-          {/* ── Centered title ── */}
-          <span className="absolute left-1/2 -translate-x-1/2 font-semibold text-[17px] text-foreground tracking-tight select-none pointer-events-none">
-            {title}
+          {/* ── Centered title (hacker mode: monospace + glow) ── */}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 font-semibold text-[17px] tracking-tight select-none pointer-events-none transition-all duration-300"
+            style={settings.hackerMode ? {
+              color: '#00FF41',
+              fontFamily: "'JetBrains Mono', monospace",
+              textShadow: '0 0 10px rgba(0,255,65,0.7)',
+              letterSpacing: '0.06em',
+            } : undefined}
+          >
+            {settings.hackerMode ? `> ${title}_` : title}
           </span>
 
           {/* ── Right side: new-chat icon + profile ── */}
