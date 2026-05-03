@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { MobileNav } from './MobileNav';
 import { MobileHeader } from './MobileHeader';
+import { DrawerNav } from './DrawerNav';
 import { useLocation } from 'wouter';
 
 interface AppShellProps {
@@ -10,32 +10,32 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [location] = useLocation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const isChat = location.startsWith('/chat');
 
   return (
     <div className="flex min-h-screen bg-background">
+
+      {/* ── Desktop sidebar ── */}
       <Sidebar />
 
-      {/*
-        Mobile: fixed top bar (56px) + floating bottom nav (~88px).
-        Chat page manages its own layout internally.
-        Desktop: no extra padding needed.
-      */}
+      {/* ── Mobile: left slide-in drawer ── */}
+      <DrawerNav open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* ── Page content ── */}
       <main className={[
         'flex-1 min-w-0',
-        // Mobile top bar offset (not on chat — chat has own header)
+        /* push content below fixed mobile top bar (56px), except chat */
         !isChat ? 'pt-14 md:pt-0' : '',
-        // Bottom nav clearance
-        !isChat ? 'pb-28 md:pb-0' : '',
+        /* bottom safe area for non-chat pages (no bottom nav any more) */
+        !isChat ? 'pb-8 md:pb-0' : '',
       ].filter(Boolean).join(' ')}>
         {children}
       </main>
 
-      {/* Mobile top bar with profile avatar */}
-      <MobileHeader />
-
-      {/* Floating bottom pill nav */}
-      <MobileNav />
+      {/* ── Mobile top bar (Gemini-style) ── */}
+      <MobileHeader onMenuClick={() => setDrawerOpen(true)} />
     </div>
   );
 }

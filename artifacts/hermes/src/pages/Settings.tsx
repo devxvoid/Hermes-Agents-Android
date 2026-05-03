@@ -117,7 +117,7 @@ export default function Settings() {
   }, []);
 
   const requestNotifications = async () => {
-    if (!('Notification' in window)) return toast({ title: 'Not supported in this browser', variant: 'destructive' });
+    if (!('Notification' in window)) { toast({ title: 'Not supported in this browser', variant: 'destructive' }); return; }
     const result = await Notification.requestPermission();
     setNotifPerm(result as PermStatus);
     if (result === 'granted') {

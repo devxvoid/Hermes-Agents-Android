@@ -6,8 +6,8 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Cpu, Settings, Zap, Brain, Camera, Check, X,
-  Moon, Sun, ChevronRight
+  Cpu, Settings, Brain, Zap, Camera, Check, X,
+  ChevronRight, Shield, Download, Trash2, Bot
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ interface ProfileSheetProps {
 }
 
 export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
-  const { settings, updateSettings, providers } = useApp();
+  const { settings, updateSettings, memories, skills, providers } = useApp();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -27,10 +27,12 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const activeProvider = providers.find(
     p => p.id === settings.activeProviderId && p.enabled && p.status === 'connected'
   );
+  const activeMemories = memories.filter(m => m.active).length;
+  const enabledSkills  = skills.filter(s => s.enabled).length;
 
   const navigate = (path: string) => {
     onOpenChange(false);
-    setTimeout(() => setLocation(path), 180);
+    setTimeout(() => setLocation(path), 160);
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,17 +57,42 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   };
 
   const initials = settings.agentName
-    .split(' ')
-    .map(w => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+    .split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
+  /* ── Nav items (Gemini "More from Gemini" style) ── */
   const navItems = [
-    { label: 'AI Provider',    path: '/ai-models',    icon: Cpu,      iconCls: 'bg-violet-500/15 text-violet-400' },
-    { label: 'Memory',         path: '/memory',        icon: Brain,    iconCls: 'bg-cyan-500/15 text-cyan-400' },
-    { label: 'Skills',         path: '/skills',        icon: Zap,      iconCls: 'bg-amber-500/15 text-amber-400' },
-    { label: 'Settings',       path: '/settings',      icon: Settings, iconCls: 'bg-primary/15 text-primary' },
+    {
+      label: 'Memory',
+      desc: `${activeMemories} active`,
+      path: '/memory',
+      icon: Brain,
+      iconBg: 'bg-cyan-500/15',
+      iconColor: 'text-cyan-400',
+    },
+    {
+      label: 'Skills',
+      desc: `${enabledSkills} enabled`,
+      path: '/skills',
+      icon: Zap,
+      iconBg: 'bg-amber-500/15',
+      iconColor: 'text-amber-400',
+    },
+    {
+      label: 'AI Provider',
+      desc: activeProvider ? `${activeProvider.name} · ${activeProvider.selectedModel}` : 'Not configured',
+      path: '/ai-models',
+      icon: Cpu,
+      iconBg: 'bg-violet-500/15',
+      iconColor: 'text-violet-400',
+    },
+    {
+      label: 'Settings',
+      desc: 'Appearance, behaviour, data',
+      path: '/settings',
+      icon: Settings,
+      iconBg: 'bg-foreground/8',
+      iconColor: 'text-foreground/60',
+    },
   ];
 
   return (
@@ -73,7 +100,7 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
       <input
         ref={fileRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={handlePhotoSelect}
       />
@@ -81,126 +108,143 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="rounded-t-[28px] border-x-0 border-b-0 p-0 overflow-hidden liquid-glass-sheet"
+          className="rounded-t-[28px] border-x-0 border-b-0 p-0 overflow-hidden profile-sheet-bg"
+          style={{ maxHeight: '92vh', overflowY: 'auto' }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Profile</SheetTitle>
           </SheetHeader>
 
-          {/* ── Drag handle ── */}
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-9 h-1 rounded-full bg-foreground/20" />
+          {/* ── Top row: email + Done ── */}
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <span className="text-xs text-foreground/45 font-medium">
+              {settings.agentName.toLowerCase().replace(/\s+/g, '.')}@agent.local
+            </span>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors px-1"
+            >
+              Done
+            </button>
           </div>
 
-          {/* ── Avatar + name ── */}
-          <div className="flex flex-col items-center gap-3 px-6 pt-3 pb-5">
-            {/* Avatar */}
+          {/* ── Avatar section ── */}
+          <div className="flex flex-col items-center gap-3 px-6 py-4">
             <div className="relative">
               <button
                 onClick={() => fileRef.current?.click()}
-                className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-primary/20 focus:outline-none active:scale-95 transition-transform"
+                className="w-[88px] h-[88px] rounded-full overflow-hidden focus:outline-none active:scale-95 transition-transform ring-[3px] ring-foreground/10"
               >
                 {settings.profileImage ? (
-                  <img
-                    src={settings.profileImage}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={settings.profileImage} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-accent">
-                    <span className="text-white font-black text-2xl select-none"
-                      style={{ textShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
+                    <span className="text-white font-black text-3xl select-none"
+                      style={{ textShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
                       {initials || 'R'}
                     </span>
                   </div>
                 )}
               </button>
-              {/* Camera badge */}
               <button
                 onClick={() => fileRef.current?.click()}
-                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-foreground/90 dark:bg-white/90 flex items-center justify-center shadow-md border-2 border-background"
+                className="absolute bottom-1 right-0 w-7 h-7 rounded-full bg-foreground/80 border-2 border-background flex items-center justify-center shadow-sm"
               >
-                <Camera className="w-3.5 h-3.5 text-background dark:text-zinc-900" />
+                <Camera className="w-3.5 h-3.5 text-background" />
               </button>
             </div>
 
             {/* Name */}
             {editingName ? (
-              <div className="flex items-center gap-2 w-full max-w-[200px]">
+              <div className="flex items-center gap-2">
                 <Input
                   value={nameVal}
                   onChange={e => setNameVal(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
-                  className="text-center font-bold text-base h-9 glass-input"
+                  className="text-center font-bold text-lg h-10 w-44 glass-input"
                   autoFocus
                 />
-                <button onClick={saveName} className="text-emerald-500"><Check className="w-4 h-4" /></button>
-                <button onClick={() => setEditingName(false)} className="text-muted-foreground"><X className="w-4 h-4" /></button>
+                <button onClick={saveName}><Check className="w-4 h-4 text-emerald-500" /></button>
+                <button onClick={() => setEditingName(false)}><X className="w-4 h-4 text-muted-foreground" /></button>
               </div>
             ) : (
               <button
                 onClick={() => { setNameVal(settings.agentName); setEditingName(true); }}
-                className="text-base font-bold text-foreground hover:text-primary transition-colors"
+                className="text-xl font-bold text-foreground hover:text-primary transition-colors"
               >
-                {settings.agentName}
+                Hi, {settings.agentName}!
               </button>
             )}
 
-            {/* Status */}
-            <div className="flex items-center gap-1.5">
-              <span className={cn(
-                'w-2 h-2 rounded-full',
-                activeProvider
-                  ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
-                  : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]'
-              )} />
-              <span className={cn('text-xs font-semibold', activeProvider ? 'text-emerald-400' : 'text-amber-400')}>
-                {activeProvider ? `${activeProvider.name} · ${activeProvider.selectedModel}` : 'Demo Mode'}
-              </span>
+            {/* AI status chip */}
+            <div className={cn(
+              'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border',
+              activeProvider
+                ? 'bg-emerald-500/12 text-emerald-400 border-emerald-500/20'
+                : 'bg-amber-500/12 text-amber-400 border-amber-500/20'
+            )}>
+              <span className={cn('w-1.5 h-1.5 rounded-full', activeProvider ? 'bg-emerald-400' : 'bg-amber-400')} />
+              {activeProvider ? `${activeProvider.name} connected` : 'Demo Mode — no AI key'}
             </div>
 
-            {/* Quick theme toggle */}
-            <div className="flex items-center gap-1 bg-muted/40 rounded-full p-1 mt-1">
-              {(['light', 'dark', 'system'] as const).map(t => {
-                const Icon = t === 'light' ? Sun : t === 'dark' ? Moon : Settings;
-                const active = settings.theme === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => updateSettings({ theme: t })}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
-                      active
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Icon className="w-3 h-3" />
-                    <span className="capitalize">{t}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Manage Agent button */}
+            <button
+              onClick={() => navigate('/settings')}
+              className="w-full max-w-[260px] border border-foreground/15 rounded-full py-2.5 text-sm font-semibold text-foreground/80 hover:bg-foreground/[0.05] transition-colors"
+            >
+              Manage Agent Settings
+            </button>
           </div>
 
-          <Separator className="opacity-40" />
+          <Separator className="opacity-20" />
 
-          {/* ── Nav links ── */}
-          <div className="px-4 py-3 space-y-1 pb-8">
-            {navItems.map(({ label, path, icon: Icon, iconCls }) => (
+          {/* ── "More from Mr. Robot" label ── */}
+          <p className="text-xs text-foreground/40 font-semibold px-5 pt-4 pb-2">
+            More from {settings.agentName}
+          </p>
+
+          {/* ── Nav items list ── */}
+          <div className="px-3 pb-2">
+            {navItems.map(({ label, desc, path, icon: Icon, iconBg, iconColor }) => (
               <button
                 key={path}
                 onClick={() => navigate(path)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-foreground/[0.05] active:bg-foreground/[0.09] transition-colors text-left"
+                className="w-full flex items-center gap-3.5 px-3 py-3.5 rounded-2xl hover:bg-foreground/[0.05] active:bg-foreground/[0.08] transition-colors text-left"
               >
-                <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', iconCls)}>
-                  <Icon className="w-4 h-4" />
+                <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center shrink-0', iconBg)}>
+                  <Icon className={cn('w-4.5 h-4.5', iconColor)} />
                 </div>
-                <span className="flex-1 text-sm font-semibold text-foreground">{label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{desc}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-foreground/20 shrink-0" />
               </button>
             ))}
           </div>
+
+          <Separator className="opacity-20 mx-4" />
+
+          {/* ── Bottom utility links ── */}
+          <div className="px-3 py-2 pb-safe space-y-0.5">
+            {[
+              { label: 'Privacy & Security', icon: Shield,   action: () => navigate('/settings') },
+              { label: 'Export Data',         icon: Download, action: () => navigate('/settings') },
+              { label: 'About Mr. Robot',     icon: Bot,      action: () => navigate('/settings') },
+            ].map(({ label, icon: Icon, action }) => (
+              <button
+                key={label}
+                onClick={action}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl hover:bg-foreground/[0.04] transition-colors"
+              >
+                <Icon className="w-4 h-4 text-foreground/35 shrink-0" />
+                <span className="text-sm text-foreground/60">{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Safe-area spacer */}
+          <div style={{ height: 'env(safe-area-inset-bottom, 16px)' }} />
         </SheetContent>
       </Sheet>
     </>
