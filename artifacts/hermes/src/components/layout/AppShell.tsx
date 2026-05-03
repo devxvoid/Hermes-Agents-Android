@@ -12,7 +12,9 @@ export function AppShell({ children }: AppShellProps) {
   const [location] = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const isChat = location.startsWith('/chat');
+  const isChat   = location.startsWith('/chat');
+  const isAgents = location.startsWith('/agents');
+  const hasOwnHeader = isChat || isAgents;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -26,10 +28,8 @@ export function AppShell({ children }: AppShellProps) {
       {/* ── Page content ── */}
       <main className={[
         'flex-1 min-w-0',
-        /* push content below fixed mobile top bar (56px), except chat */
-        !isChat ? 'pt-14 md:pt-0' : '',
-        /* bottom safe area for non-chat pages (no bottom nav any more) */
-        !isChat ? 'pb-8 md:pb-0' : '',
+        !hasOwnHeader ? 'pt-14 md:pt-0' : '',
+        !hasOwnHeader ? 'pb-8 md:pb-0' : '',
       ].filter(Boolean).join(' ')}>
         {children}
       </main>

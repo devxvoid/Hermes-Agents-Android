@@ -31,9 +31,9 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
   const { settings } = useApp();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  /* Chat page manages its own full-screen header */
-  const isChat = location.startsWith('/chat');
-  if (isChat) return null;
+  /* Chat and agent pages manage their own headers */
+  const hideHeader = location.startsWith('/chat') || location.startsWith('/agents');
+  if (hideHeader) return null;
 
   const title = getTitle(location);
 

@@ -12,6 +12,8 @@ import MemoryPage from '@/pages/Memory';
 import Skills from '@/pages/Skills';
 import AIModels from '@/pages/AIModels';
 import Settings from '@/pages/Settings';
+import Agents from '@/pages/Agents';
+import AgentEditor from '@/pages/AgentEditor';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient({
@@ -32,6 +34,8 @@ function AppRoutes() {
         <Route path="/skills" component={Skills} />
         <Route path="/ai-models" component={AIModels} />
         <Route path="/settings" component={Settings} />
+        <Route path="/agents" component={Agents} />
+        <Route path="/agents/:id" component={AgentEditor} />
         <Route component={NotFound} />
       </Switch>
     </AppShell>

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Conversation, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor } from '../types';
-import { StorageKeys, safeJsonParse, normalizeConversation, normalizeMemory, normalizeSkill, normalizeProvider, normalizeSettings, setStorageData } from '../lib/storage';
+import { Conversation, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor, Agent } from '../types';
+import { StorageKeys, safeJsonParse, normalizeConversation, normalizeMemory, normalizeSkill, normalizeProvider, normalizeSettings, normalizeAgent, setStorageData } from '../lib/storage';
 import { defaultMemories, defaultSkills } from '../lib/seedData';
 
 interface AppContextType {
@@ -9,6 +9,7 @@ interface AppContextType {
   skills: Skill[];
   settings: AppSettings;
   providers: AIProviderConfig[];
+  agents: Agent[];
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
   addConversation: (conv: Conversation) => void;
@@ -24,6 +25,9 @@ interface AppContextType {
   addProvider: (provider: AIProviderConfig) => void;
   updateProvider: (id: string, updates: Partial<AIProviderConfig>) => void;
   deleteProvider: (id: string) => void;
+  addAgent: (agent: Agent) => void;
+  updateAgent: (id: string, updates: Partial<Agent>) => void;
+  deleteAgent: (id: string) => void;
   clearAllData: () => void;
   clearAllApiKeys: () => void;
   exportData: (includeKeys?: boolean) => object;
@@ -89,6 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [settings, setSettings] = useState<AppSettings>(() => normalizeSettings({}));
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
@@ -117,6 +122,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const rawProviders = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.PROVIDERS), []);
     setProviders(rawProviders.map(normalizeProvider));
+
+    const rawAgents = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.AGENTS), []);
+    setAgents(rawAgents.map(normalizeAgent));
 
     setInitialized(true);
   }, []);
@@ -250,6 +258,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addAgent = useCallback((agent: Agent) => {
+    setAgents(prev => {
+      const next = [agent, ...prev];
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
+  const updateAgent = useCallback((id: string, updates: Partial<Agent>) => {
+    setAgents(prev => {
+      const next = prev.map(a => a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a);
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
+  const deleteAgent = useCallback((id: string) => {
+    setAgents(prev => {
+      const next = prev.filter(a => a.id !== id);
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
   const clearAllData = useCallback(() => {
     Object.values(StorageKeys).forEach(k => localStorage.removeItem(k));
     setConversations([]);
@@ -257,6 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSkills(defaultSkills);
     setSettings(normalizeSettings({}));
     setProviders([]);
+    setAgents([]);
     setActiveConversationId(null);
     setStorageData(StorageKeys.MEMORIES, defaultMemories);
     setStorageData(StorageKeys.SKILLS, defaultSkills);
@@ -310,12 +343,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      conversations, memories, skills, settings, providers,
+      conversations, memories, skills, settings, providers, agents,
       activeConversationId, setActiveConversationId,
       addConversation, updateConversation, deleteConversation,
       addMemory, updateMemory, deleteMemory,
       addSkill, updateSkill, deleteSkill,
       updateSettings,
+      addAgent, updateAgent, deleteAgent,
       addProvider, updateProvider, deleteProvider,
       clearAllData, clearAllApiKeys, exportData, importData,
     }}>
