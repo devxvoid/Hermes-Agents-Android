@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Conversation, Memory, Skill, AppSettings, AIProviderConfig } from '../types';
-import { StorageKeys, safeJsonParse, normalizeConversation, normalizeMemory, normalizeSkill, normalizeProvider, normalizeSettings, setStorageData } from '../lib/storage';
+import { Conversation, Memory, Skill, AppSettings, AIProviderConfig, ThemeColor, Agent } from '../types';
+import { StorageKeys, safeJsonParse, normalizeConversation, normalizeMemory, normalizeSkill, normalizeProvider, normalizeSettings, normalizeAgent, setStorageData } from '../lib/storage';
 import { defaultMemories, defaultSkills } from '../lib/seedData';
 
 interface AppContextType {
@@ -9,6 +9,7 @@ interface AppContextType {
   skills: Skill[];
   settings: AppSettings;
   providers: AIProviderConfig[];
+  agents: Agent[];
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
   addConversation: (conv: Conversation) => void;
@@ -24,6 +25,9 @@ interface AppContextType {
   addProvider: (provider: AIProviderConfig) => void;
   updateProvider: (id: string, updates: Partial<AIProviderConfig>) => void;
   deleteProvider: (id: string) => void;
+  addAgent: (agent: Agent) => void;
+  updateAgent: (id: string, updates: Partial<Agent>) => void;
+  deleteAgent: (id: string) => void;
   clearAllData: () => void;
   clearAllApiKeys: () => void;
   exportData: (includeKeys?: boolean) => object;
@@ -32,19 +36,70 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+/* ── Colour palette lookup table (HSL triplets, no hsl() wrapper) ── */
+type PaletteEntry = {
+  light: { primary: string; ring: string; accent: string };
+  dark:  { primary: string; ring: string; accent: string };
+};
+
+const COLOR_PALETTES: Record<ThemeColor, PaletteEntry> = {
+  dynamic: {
+    light: { primary: '200 80% 46%',  ring: '200 80% 46%',  accent: '185 70% 38%' },
+    dark:  { primary: '200 85% 62%',  ring: '200 85% 62%',  accent: '185 75% 55%' },
+  },
+  ocean: {
+    light: { primary: '185 68% 40%',  ring: '185 68% 40%',  accent: '195 70% 44%' },
+    dark:  { primary: '185 72% 54%',  ring: '185 72% 54%',  accent: '195 72% 58%' },
+  },
+  purple: {
+    light: { primary: '268 62% 52%',  ring: '268 62% 52%',  accent: '280 58% 56%' },
+    dark:  { primary: '268 68% 66%',  ring: '268 68% 66%',  accent: '280 65% 70%' },
+  },
+  forest: {
+    light: { primary: '148 55% 36%',  ring: '148 55% 36%',  accent: '158 52% 40%' },
+    dark:  { primary: '148 58% 50%',  ring: '148 58% 50%',  accent: '158 55% 54%' },
+  },
+  slate: {
+    light: { primary: '213 32% 44%',  ring: '213 32% 44%',  accent: '220 30% 48%' },
+    dark:  { primary: '213 32% 62%',  ring: '213 32% 62%',  accent: '220 30% 66%' },
+  },
+  rose: {
+    light: { primary: '348 70% 48%',  ring: '348 70% 48%',  accent: '355 65% 52%' },
+    dark:  { primary: '348 75% 62%',  ring: '348 75% 62%',  accent: '355 70% 66%' },
+  },
+};
+
+/* Apply / clear the active theme colour vars directly on <html> inline style */
+function applyThemeColor(root: HTMLElement, color: ThemeColor, isDark: boolean) {
+  const palette = COLOR_PALETTES[color] ?? COLOR_PALETTES.dynamic;
+  const vars = isDark ? palette.dark : palette.light;
+
+  const PROPS = ['--primary', '--ring', '--accent', '--sidebar-primary', '--sidebar-ring', '--chart-1'];
+  const propMap: Record<string, string> = {
+    '--primary': vars.primary,
+    '--ring': vars.ring,
+    '--accent': vars.accent,
+    '--sidebar-primary': vars.primary,
+    '--sidebar-ring': vars.ring,
+    '--chart-1': vars.primary,
+  };
+
+  PROPS.forEach(p => root.style.setProperty(p, propMap[p]));
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [settings, setSettings] = useState<AppSettings>(() => normalizeSettings({}));
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const rawConvs = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.CONVERSATIONS), []);
-    const loadedConvs = rawConvs.map(normalizeConversation);
-    setConversations(loadedConvs);
+    setConversations(rawConvs.map(normalizeConversation));
 
     const rawMems = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.MEMORIES), []);
     if (rawMems.length === 0) {
@@ -63,31 +118,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const rawSettings = safeJsonParse<any>(localStorage.getItem(StorageKeys.SETTINGS), {});
-    const loadedSettings = normalizeSettings(rawSettings);
-    setSettings(loadedSettings);
+    setSettings(normalizeSettings(rawSettings));
 
     const rawProviders = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.PROVIDERS), []);
     setProviders(rawProviders.map(normalizeProvider));
 
+    const rawAgents = safeJsonParse<any[]>(localStorage.getItem(StorageKeys.AGENTS), []);
+    setAgents(rawAgents.map(normalizeAgent));
+
     setInitialized(true);
   }, []);
 
+  /* ── Apply all appearance classes/vars to <html> ── */
   useEffect(() => {
     if (!initialized) return;
-    const theme = settings.theme;
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else if (theme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  }, [settings.theme, initialized]);
+    const { theme, themeColor, amoledBlack, systemFont, hackerMode } = settings;
+
+    /* 1. Dark / light / system */
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark) || !!hackerMode;
+    root.classList.toggle('dark', isDark);
+
+    /* 2. Theme colour — inline style wins over any stylesheet rule */
+    applyThemeColor(root, themeColor ?? 'dynamic', isDark);
+
+    /* 3. AMOLED pure black */
+    root.classList.toggle('amoled', !!amoledBlack);
+
+    /* 4. System font override */
+    root.classList.toggle('system-font', !!systemFont && !hackerMode);
+
+    /* 5. Hacker terminal theme */
+    root.classList.toggle('hacker', !!hackerMode);
+  }, [settings.theme, settings.themeColor, settings.amoledBlack, settings.systemFont, settings.hackerMode, initialized]);
 
   const addConversation = useCallback((conv: Conversation) => {
     setConversations(prev => {
@@ -194,6 +258,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addAgent = useCallback((agent: Agent) => {
+    setAgents(prev => {
+      const next = [agent, ...prev];
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
+  const updateAgent = useCallback((id: string, updates: Partial<Agent>) => {
+    setAgents(prev => {
+      const next = prev.map(a => a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a);
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
+  const deleteAgent = useCallback((id: string) => {
+    setAgents(prev => {
+      const next = prev.filter(a => a.id !== id);
+      setStorageData(StorageKeys.AGENTS, next);
+      return next;
+    });
+  }, []);
+
   const clearAllData = useCallback(() => {
     Object.values(StorageKeys).forEach(k => localStorage.removeItem(k));
     setConversations([]);
@@ -201,6 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSkills(defaultSkills);
     setSettings(normalizeSettings({}));
     setProviders([]);
+    setAgents([]);
     setActiveConversationId(null);
     setStorageData(StorageKeys.MEMORIES, defaultMemories);
     setStorageData(StorageKeys.SKILLS, defaultSkills);
@@ -218,10 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
-      conversations,
-      memories,
-      skills,
-      settings,
+      conversations, memories, skills, settings,
       providers: includeKeys ? providers : providers.map(p => ({ ...p, apiKey: '' })),
     };
   }, [conversations, memories, skills, settings, providers]);
@@ -257,12 +343,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      conversations, memories, skills, settings, providers,
+      conversations, memories, skills, settings, providers, agents,
       activeConversationId, setActiveConversationId,
       addConversation, updateConversation, deleteConversation,
       addMemory, updateMemory, deleteMemory,
       addSkill, updateSkill, deleteSkill,
       updateSettings,
+      addAgent, updateAgent, deleteAgent,
       addProvider, updateProvider, deleteProvider,
       clearAllData, clearAllApiKeys, exportData, importData,
     }}>

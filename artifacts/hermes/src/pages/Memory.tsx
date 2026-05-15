@@ -54,15 +54,15 @@ export default function MemoryPage() {
             placeholder="Search memories..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 glass-input border-white/10"
+            className="pl-9 glass-input"
             data-testid="input-search-memory"
           />
         </div>
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-40 glass-input border-white/10" data-testid="select-memory-filter">
+          <SelectTrigger className="w-40 glass-input" data-testid="select-memory-filter">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="glass border-white/10">
+          <SelectContent>
             {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>

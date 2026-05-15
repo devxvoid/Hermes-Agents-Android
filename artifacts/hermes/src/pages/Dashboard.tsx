@@ -1,211 +1,486 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Link } from 'wouter';
-import { MessageSquare, Brain, Zap, Cpu, Plus, ArrowRight, Clock, Pin } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Message, Conversation } from '@/types';
+import { MessageBubble, TypingIndicator } from '@/components/chat/MessageBubble';
+import { AttachmentMenu } from '@/components/ui/AttachmentMenu';
+import { ToolsSheet } from '@/components/ui/ToolsSheet';
+import { ModelPickerSheet } from '@/components/ui/ModelPickerSheet';
+import { VoiceInputBar } from '@/components/ui/VoiceInputBar';
+import { classifyMessageIntent, shouldUseMemory, shouldTriggerSkill, generateDemoResponse } from '@/lib/agentEngine';
+import { sendAIMessage, sendAIMessageStream } from '@/lib/ai/aiClient';
+import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mic, BarChart2, Plus, SlidersHorizontal,
+  Sparkles, Send, Paperclip, X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function StatCard({ label, value, icon: Icon, accent }: { label: string; value: number; icon: any; accent: string }) {
+/* ── Suggestion chips — normal mode ── */
+const SUGGESTIONS_NORMAL = [
+  { emoji: '🎯', label: 'Hack a problem'       },
+  { emoji: '🔬', label: 'Analyze the data'     },
+  { emoji: '💻', label: 'Write me some code'   },
+  { emoji: '🌐', label: 'Research the web'     },
+];
+
+/* ── Suggestion chips — hacker terminal mode ── */
+const SUGGESTIONS_HACKER = [
+  { emoji: '>', label: 'sudo infiltrate --target' },
+  { emoji: '>', label: 'run exploit.sh'           },
+  { emoji: '>', label: 'decrypt -f ciphertext'    },
+  { emoji: '>', label: 'nmap -sS 0.0.0.0/0'       },
+];
+
+interface AttachedFile { name: string; content: string; type: string; }
+
+export default function Dashboard() {
+  const {
+    settings, memories, skills, providers,
+    conversations, addConversation, updateConversation, agents,
+  } = useApp();
+  const { toast } = useToast();
+
+  /* ── Local state ── */
+  const [convId,          setConvId]          = useState<string | null>(null);
+  const [isTyping,        setIsTyping]        = useState(false);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [inputValue,      setInputValue]      = useState('');
+  const [attachments,     setAttachments]     = useState<AttachedFile[]>([]);
+  const [attachOpen,      setAttachOpen]      = useState(false);
+  const [toolsOpen,       setToolsOpen]       = useState(false);
+  const [modelOpen,       setModelOpen]       = useState(false);
+  const [voiceActive,     setVoiceActive]     = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef   = useRef<HTMLDivElement>(null);
+
+  /* ── Derived ── */
+  const activeConv = convId ? conversations.find(c => c.id === convId) : null;
+  const messages   = activeConv?.messages ?? [];
+  const isEmpty    = messages.length === 0 && !isTyping && streamingContent === null;
+  const activeProvider = providers.find(
+    p => p.id === settings.activeProviderId && p.enabled && p.status === 'connected'
+  );
+
+  /* ── Pick up chip pre-fill from navigation ── */
+  useEffect(() => {
+    const pre = sessionStorage.getItem('chat_prefill');
+    if (pre) { sessionStorage.removeItem('chat_prefill'); setInputValue(pre); }
+  }, []);
+
+  /* ── Listen for "New chat" signal from drawer ── */
+  useEffect(() => {
+    const reset = () => {
+      setConvId(null);
+      setInputValue('');
+      setAttachments([]);
+      setIsTyping(false);
+      setStreamingContent(null);
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    };
+    window.addEventListener('mr-robot-new-chat', reset);
+    return () => window.removeEventListener('mr-robot-new-chat', reset);
+  }, []);
+
+  /* ── Auto-scroll ── */
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }, 50);
+  }, []);
+  useEffect(() => { scrollToBottom(); }, [messages.length, isTyping, streamingContent, scrollToBottom]);
+
+  /* ── Textarea auto-resize ── */
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, []);
+
+  /* ── File processing ── */
+  const processFile = useCallback(async (file: File) => {
+    try {
+      const content = file.type.startsWith('image/')
+        ? await readAsDataURL(file)
+        : await readAsText(file);
+      setAttachments(prev => [...prev, { name: file.name, content, type: file.type }].slice(0, 5));
+    } catch {
+      setAttachments(prev => [...prev, { name: file.name, content: `[Binary file]`, type: file.type }].slice(0, 5));
+    }
+  }, []);
+
+  /* ── Send message ── */
+  const handleSend = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed && attachments.length === 0) return;
+
+    /* Create conversation if needed */
+    let cid = convId;
+    let conv = cid ? conversations.find(c => c.id === cid) : null;
+    if (!conv) {
+      const id = crypto.randomUUID();
+      const newConv: Conversation = {
+        id, title: trimmed.slice(0, 50) || 'New Chat', messages: [],
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        pinned: false, archived: false, tags: [],
+      };
+      addConversation(newConv);
+      setConvId(id);
+      cid = id; conv = newConv;
+    }
+
+    /* Build message text (embed attachments) */
+    let msgText = trimmed;
+    if (attachments.length > 0) {
+      const parts = attachments.map(f =>
+        f.type.startsWith('image/')
+          ? `[Image: ${f.name}]`
+          : `[File: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``
+      ).join('\n\n');
+      msgText = msgText ? `${msgText}\n\n${parts}` : parts;
+    }
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(), role: 'user', content: msgText,
+      createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+    };
+    const updated = [...(conv.messages ?? []), userMsg];
+    const title   = conv.messages.length === 0 ? trimmed.slice(0, 60) : conv.title;
+    updateConversation(cid!, { messages: updated, title, updatedAt: new Date().toISOString() });
+
+    setInputValue('');
+    setAttachments([]);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    setIsTyping(true);
+    scrollToBottom();
+
+    try {
+      const activeMems   = memories.filter(m => m.active);
+      const activeSkills = skills.filter(s => s.enabled);
+      const useMem = settings.useMemoryByDefault && shouldUseMemory(trimmed, activeMems);
+      const usedMems = useMem
+        ? activeMems.filter(m => m.content.toLowerCase().split(/\s+/).some(w => trimmed.toLowerCase().split(/\s+/).includes(w) && w.length > 3))
+        : [];
+      const triggered = settings.activateSkillsByDefault && shouldTriggerSkill(trimmed, activeSkills)
+        ? activeSkills.filter(s => s.triggerKeywords.some(kw => trimmed.toLowerCase().includes(kw.toLowerCase())))
+        : [];
+
+      const t0 = Date.now();
+      let responseText = '';
+      let mode: 'online' | 'local' | 'demo' = 'demo';
+      let providerName = 'Demo';
+      let model = 'Demo';
+
+      if (activeProvider) {
+        const sysp = buildSystemPrompt(usedMems, triggered);
+        const msgList = updated.map(m => ({ role: m.role, content: m.content }));
+
+        if (settings.streamingEnabled) {
+          setIsTyping(false);
+          setStreamingContent('');
+          responseText = await sendAIMessageStream(msgList, sysp, activeProvider, {}, (chunk) => {
+            setStreamingContent(prev => (prev ?? '') + chunk);
+          });
+          setStreamingContent(null);
+        } else {
+          responseText = await sendAIMessage(msgList, sysp, activeProvider, {});
+        }
+
+        mode = activeProvider.mode as 'online' | 'local';
+        providerName = activeProvider.name;
+        model = activeProvider.selectedModel;
+      } else {
+        await new Promise(r => setTimeout(r, 400 + Math.random() * 400));
+        responseText = generateDemoResponse(classifyMessageIntent(trimmed), trimmed, usedMems, triggered, settings);
+      }
+
+      const assistantMsg: Message = {
+        id: crypto.randomUUID(), role: 'assistant', content: responseText,
+        createdAt: new Date().toISOString(),
+        usedMemoryIds: usedMems.map(m => m.id),
+        triggeredSkillIds: triggered.map(s => s.id),
+        metadata: {
+          providerId: activeProvider?.id ?? 'demo', providerName, model, mode,
+          latencyMs: Date.now() - t0, streaming: settings.streamingEnabled && !!activeProvider,
+          usedMemoryIds: usedMems.map(m => m.id),
+          triggeredSkillIds: triggered.map(s => s.id),
+        },
+      };
+      updateConversation(cid!, { messages: [...updated, assistantMsg], updatedAt: new Date().toISOString() });
+    } catch (err: any) {
+      setStreamingContent(null);
+      const errMsg: Message = {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: `Error: ${err.message ?? 'Something went wrong.'}`,
+        createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+        metadata: { providerId: 'error', providerName: 'Error', model: 'N/A', mode: 'demo', streaming: false, usedMemoryIds: [], triggeredSkillIds: [], error: err.message },
+      };
+      updateConversation(cid!, { messages: [...updated, errMsg], updatedAt: new Date().toISOString() });
+      toast({ title: 'AI Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsTyping(false);
+      setStreamingContent(null);
+      scrollToBottom();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId, conversations, memories, skills, settings, providers, attachments, addConversation, updateConversation, scrollToBottom, toast]);
+
+  function buildSystemPrompt(usedMems: typeof memories, triggered: typeof skills) {
+    const activeAgent = agents.find(a => a.id === settings.activeAgentId);
+    let p = activeAgent?.instructions
+      ? activeAgent.instructions
+      : `You are ${settings.agentName}, a professional autonomous AI assistant. Be clear, practical, and concise.`;
+    const style = activeAgent?.responseStyle ?? settings.responseStyle;
+    if (style === 'concise')       p += '\n\nKeep responses brief and direct.';
+    if (style === 'formal')        p += '\n\nUse a formal, professional tone.';
+    if (style === 'socratic')      p += '\n\nAsk clarifying questions before answering when useful.';
+    if (style === 'comprehensive') p += '\n\nProvide detailed, thorough responses.';
+    if (style === 'detailed')      p += '\n\nProvide detailed responses.';
+    if (usedMems.length  > 0) p += '\n\nUser memory:\n'  + usedMems.map(m => `- ${m.content}`).join('\n');
+    if (triggered.length > 0) p += '\n\nActive skills:\n' + triggered.map(s => `- ${s.name}: ${s.instructionPrompt}`).join('\n');
+    return p;
+  }
+
+  /* ── Bottom bar height estimate for scroll padding ── */
+  const BOTTOM_BAR_H = attachments.length > 0 ? 160 : 128;
+
+  /* ── Streaming fake message for live rendering ── */
+  const streamingMsg: Message | null = streamingContent !== null ? {
+    id: 'streaming', role: 'assistant', content: streamingContent,
+    createdAt: new Date().toISOString(), usedMemoryIds: [], triggeredSkillIds: [],
+  } : null;
+
   return (
-    <div className="glass-card rounded-2xl p-4 flex items-center gap-3">
-      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', accent)}>
-        <Icon className="w-5 h-5" />
+    <div className="min-h-screen bg-background flex flex-col">
+
+      {/* ══════ Greeting (empty state) ══════ */}
+      {isEmpty ? (
+        <div className="flex-1 px-6 pt-10 md:pt-16" style={{ paddingBottom: BOTTOM_BAR_H + 16 }}>
+          {settings.hackerMode ? (
+            <div className="mb-10">
+              <p className="text-xs font-bold tracking-[0.25em] uppercase mb-3"
+                style={{ color: 'rgba(0,255,65,0.55)' }}>
+                // ACCESS_GRANTED · FSOCIETY_OS v2.0
+              </p>
+              <h1 className="text-[28px] md:text-[36px] font-bold leading-tight tracking-tight"
+                style={{ color: '#00FF41' }}>
+                HELLO, FRIEND_
+              </h1>
+              <p className="text-sm mt-2" style={{ color: 'rgba(0,255,65,0.50)' }}>
+                root@mrrobot:~# awaiting command...
+              </p>
+            </div>
+          ) : (
+            <div className="mb-10">
+              <p className="text-base text-foreground/50 font-medium mb-1 tracking-wide uppercase text-xs">
+                HELLO, FRIEND
+              </p>
+              <h1 className="text-[32px] md:text-[40px] font-bold text-foreground leading-tight tracking-tight">
+                What are we<br />breaking today?
+              </h1>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 max-w-sm">
+            {(settings.hackerMode ? SUGGESTIONS_HACKER : SUGGESTIONS_NORMAL).map(({ emoji, label }) => (
+              <button
+                key={label}
+                onClick={() => { setInputValue(label); setTimeout(() => textareaRef.current?.focus(), 50); }}
+                className="gemini-chip flex items-center gap-3 px-5 py-3.5 rounded-full text-left w-fit"
+              >
+                <span className={cn(
+                  'leading-none select-none shrink-0',
+                  settings.hackerMode ? 'text-sm font-bold' : 'text-xl'
+                )}>{emoji}</span>
+                <span className="text-[15px] font-medium text-foreground/90">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* ══════ Messages area ══════ */
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 space-y-4"
+          style={{ paddingBottom: BOTTOM_BAR_H + 16 }}
+        >
+          {messages.map(msg => (
+            <MessageBubble key={msg.id} message={msg} memories={memories} skills={skills} />
+          ))}
+          {isTyping && <TypingIndicator />}
+          {streamingMsg && (
+            <MessageBubble message={streamingMsg} memories={memories} skills={skills} streaming />
+          )}
+        </div>
+      )}
+
+      {/* ══════ Fixed bottom input bar ══════ */}
+      <div
+        className="fixed bottom-0 left-0 right-0 md:left-[220px] px-4 pt-3 gemini-bottom-bar"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+      >
+        {/* Attachment chips */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+            {attachments.map((file, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 text-xs font-medium text-primary"
+              >
+                {file.type.startsWith('image/') ? (
+                  <img src={file.content} alt={file.name} className="w-5 h-5 rounded object-cover" />
+                ) : (
+                  <Paperclip className="w-3 h-3 shrink-0" />
+                )}
+                <span className="max-w-[120px] truncate">{file.name}</span>
+                <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}>
+                  <X className="w-3 h-3 text-primary/60 hover:text-primary" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input pill */}
+        <div
+          className="gemini-input-pill w-full px-4 pt-3.5 pb-3 mb-3 flex items-end gap-2"
+          onClick={() => textareaRef.current?.focus()}
+        >
+          <textarea
+            ref={textareaRef}
+            value={inputValue}
+            onChange={e => { setInputValue(e.target.value); autoResize(); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(inputValue); }
+            }}
+            disabled={isTyping || streamingContent !== null}
+            placeholder={`Ask ${settings.agentName}…`}
+            rows={1}
+            className="flex-1 bg-transparent text-[15px] text-foreground placeholder:text-foreground/35 outline-none resize-none leading-relaxed self-center disabled:opacity-50"
+            style={{ minHeight: '24px', maxHeight: '120px' }}
+          />
+
+          {(inputValue.trim() || attachments.length > 0) && (
+            <button
+              onClick={() => handleSend(inputValue)}
+              disabled={isTyping || streamingContent !== null}
+              className="shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 active:scale-90 transition-all disabled:opacity-40"
+            >
+              <Send className="w-3.5 h-3.5 text-white" />
+            </button>
+          )}
+        </div>
+
+        {/* Toolbar row */}
+        <AnimatePresence mode="wait" initial={false}>
+          {voiceActive ? (
+            <VoiceInputBar
+              key="voice"
+              onAttach={() => { setVoiceActive(false); setAttachOpen(true); }}
+              onTranscriptChange={text => setInputValue(text)}
+              onStop={text => {
+                setVoiceActive(false);
+                if (text) setInputValue(text);
+                setTimeout(() => textareaRef.current?.focus(), 80);
+              }}
+              onSend={text => {
+                setVoiceActive(false);
+                setInputValue('');
+                if (text) handleSend(text);
+              }}
+            />
+          ) : (
+            <motion.div
+              key="toolbar"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center justify-between px-1"
+            >
+              <div className="flex items-center gap-5">
+                <button
+                  className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
+                  onClick={e => { e.stopPropagation(); setAttachOpen(v => !v); }}
+                >
+                  <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+                <button
+                  className="text-foreground/50 hover:text-foreground/80 transition-colors active:scale-90"
+                  onClick={e => { e.stopPropagation(); setToolsOpen(true); }}
+                >
+                  <SlidersHorizontal className="w-[20px] h-[20px]" strokeWidth={1.8} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={e => { e.stopPropagation(); setModelOpen(true); }}
+                  className="gemini-speed-badge flex items-center gap-1.5 px-3.5 py-1.5 rounded-full active:scale-95 transition-transform"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-foreground/60" />
+                  <span className="text-[13px] font-medium text-foreground/70">
+                    {activeProvider ? (activeProvider.selectedModel.split('/').pop()?.slice(0, 12) ?? 'AI') : 'Demo'}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setVoiceActive(true)}
+                  className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90"
+                >
+                  <Mic className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+                <button className="text-foreground/55 hover:text-foreground/80 transition-colors active:scale-90">
+                  <BarChart2 className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      <div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
-      </div>
+
+      {/* Attachment menu */}
+      <AttachmentMenu
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onFile={processFile}
+        bottomOffset={130}
+      />
+
+      {/* Tools sheet */}
+      <ToolsSheet
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        onSelect={prompt => {
+          setInputValue(prompt);
+          setTimeout(() => {
+            textareaRef.current?.focus();
+            autoResize();
+          }, 80);
+        }}
+      />
+
+      {/* Model picker sheet */}
+      <ModelPickerSheet open={modelOpen} onClose={() => setModelOpen(false)} />
     </div>
   );
 }
 
-export default function Dashboard() {
-  const { conversations, memories, skills, providers, settings } = useApp();
-  const activeProvider = providers.find(p => p.id === settings.activeProviderId && p.status === 'connected');
-  const recentConvs = [...conversations]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5);
-  const activeMemories = memories.filter(m => m.active);
-  const enabledSkills   = skills.filter(s => s.enabled);
-  const configuredProviders = providers.filter(p => p.status === 'connected').length;
-
-  const quickActions = [
-    { label: 'New Chat',     icon: MessageSquare, href: '/chat',      color: 'bg-primary/12 text-primary border-primary/20'        },
-    { label: 'Add Memory',   icon: Brain,         href: '/memory',    color: 'bg-cyan-500/12 text-cyan-400 border-cyan-500/20'     },
-    { label: 'Create Skill', icon: Zap,           href: '/skills',    color: 'bg-violet-500/12 text-violet-400 border-violet-500/20'},
-    { label: 'Configure AI', icon: Cpu,           href: '/ai-models', color: 'bg-amber-500/12 text-amber-400 border-amber-500/20'  },
-  ];
-
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
-
-      {/* ── Hero ── */}
-      <div className="glass-strong rounded-3xl p-5 relative overflow-hidden glass-shine">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/5 pointer-events-none" />
-        <div className="relative flex items-start justify-between flex-wrap gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h1 className="text-2xl font-bold">{settings.agentName}</h1>
-              <span className={cn(
-                'text-xs px-2.5 py-1 rounded-full border font-medium',
-                activeProvider
-                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                  : 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-              )}>
-                {activeProvider ? 'Online' : 'Demo Mode'}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              Autonomous assistant for research, task management, data analysis, and agent orchestration.
-            </p>
-            {activeProvider && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Active: <span className="text-foreground font-medium">{activeProvider.selectedModel}</span>
-                {' '}via {activeProvider.name}
-              </p>
-            )}
-          </div>
-          <Link
-            href="/chat"
-            className="btn-pill flex items-center gap-2 px-4 py-2.5 text-sm font-medium shrink-0"
-          >
-            <Plus className="w-4 h-4" /> New Chat
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Stats ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Conversations"  value={conversations.length}     icon={MessageSquare} accent="bg-primary/15 text-primary"         />
-        <StatCard label="Active Memories" value={activeMemories.length}    icon={Brain}         accent="bg-cyan-500/15 text-cyan-400"       />
-        <StatCard label="Active Skills"  value={enabledSkills.length}     icon={Zap}           accent="bg-violet-500/15 text-violet-400"   />
-        <StatCard label="AI Models"      value={configuredProviders}       icon={Cpu}           accent="bg-amber-500/15 text-amber-400"     />
-      </div>
-
-      {/* ── Quick Actions ── */}
-      <div>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map(({ label, icon: Icon, href, color }) => (
-            <Link
-              key={href}
-              href={href}
-              data-testid={`quick-action-${label.toLowerCase().replace(/\s/g, '-')}`}
-              className={cn(
-                'flex flex-col items-center gap-2 p-4 rounded-2xl border glass-card transition-all',
-                color
-              )}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-xs font-medium text-center leading-tight">{label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Bottom 2-col ── */}
-      <div className="grid md:grid-cols-2 gap-4">
-
-        {/* Recent Conversations */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Chats</h2>
-            <Link href="/conversations" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-          {recentConvs.length === 0 ? (
-            <div className="glass-card rounded-2xl p-6 text-center">
-              <MessageSquare className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No conversations yet.</p>
-              <Link href="/chat" className="text-sm text-primary hover:underline mt-1 inline-block">
-                Start your first chat →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentConvs.map(conv => (
-                <Link
-                  key={conv.id}
-                  href={`/chat/${conv.id}`}
-                  data-testid={`recent-conv-${conv.id}`}
-                  className="flex items-center gap-3 glass-card rounded-2xl p-3 block"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-primary/12 border border-primary/20 flex items-center justify-center shrink-0">
-                    <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      {conv.pinned && <Pin className="w-3 h-3 text-primary" />}
-                      <span className="text-sm font-medium truncate">{conv.title}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3" />
-                      {formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })}
-                      <span>· {conv.messages.length} msgs</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Memory Highlights */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Memory Highlights</h2>
-            <Link href="/memory" className="text-xs text-primary hover:underline flex items-center gap-1">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-          {activeMemories.length === 0 ? (
-            <div className="glass-card rounded-2xl p-6 text-center">
-              <Brain className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No active memories.</p>
-              <Link href="/memory" className="text-sm text-primary hover:underline mt-1 inline-block">
-                Add your first memory →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activeMemories.slice(0, 4).map(mem => (
-                <div key={mem.id} className="glass-card rounded-2xl p-3 flex items-start gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{mem.title}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{mem.content}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Active Skills ── */}
-      {enabledSkills.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Skills</h2>
-            <Link href="/skills" className="text-xs text-primary hover:underline flex items-center gap-1">
-              Manage <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {enabledSkills.map(skill => (
-              <span
-                key={skill.id}
-                data-testid={`skill-badge-${skill.id}`}
-                className="text-xs glass-card border-violet-500/20 text-violet-400 px-3 py-1 rounded-full font-medium"
-              >
-                {skill.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+/* ── File utilities ── */
+function readAsText(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target?.result as string);
+    r.onerror = rej;
+    r.readAsText(file);
+  });
+}
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target?.result as string);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
 }

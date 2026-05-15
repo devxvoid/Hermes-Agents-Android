@@ -1,6 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { MobileNav } from './MobileNav';
+import { MobileHeader } from './MobileHeader';
+import { DrawerNav } from './DrawerNav';
 import { useLocation } from 'wouter';
 
 interface AppShellProps {
@@ -9,20 +10,32 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [location] = useLocation();
-  const isChat = location.startsWith('/chat');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const isChat   = location.startsWith('/chat');
+  const isAgents = location.startsWith('/agents');
+  const hasOwnHeader = isChat || isAgents;
 
   return (
     <div className="flex min-h-screen bg-background">
+
+      {/* ── Desktop sidebar ── */}
       <Sidebar />
-      {/*
-        Non-chat pages: pad bottom to clear the floating pill nav
-        (pill is at bottom-5=20px, ~68px tall → need ~100px clearance)
-        Chat page: manages its own layout internally, no extra padding needed
-      */}
-      <main className={`flex-1 min-w-0 md:pb-0 ${isChat ? '' : 'pb-28'}`}>
+
+      {/* ── Mobile: left slide-in drawer ── */}
+      <DrawerNav open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* ── Page content ── */}
+      <main className={[
+        'flex-1 min-w-0',
+        !hasOwnHeader ? 'pt-14 md:pt-0' : '',
+        !hasOwnHeader ? 'pb-8 md:pb-0' : '',
+      ].filter(Boolean).join(' ')}>
         {children}
       </main>
-      <MobileNav />
+
+      {/* ── Mobile top bar (Gemini-style) ── */}
+      <MobileHeader onMenuClick={() => setDrawerOpen(true)} />
     </div>
   );
 }
